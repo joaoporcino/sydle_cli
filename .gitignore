@@ -1,0 +1,7 @@
+node_modules
+.env
+sydle-dev
+sydle-hom
+sydle-prod
+*.log
+.DS_Store
