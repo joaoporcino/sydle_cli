@@ -4,8 +4,6 @@ const signIn = async (userLogin, userPassword, baseURLOverride) => {
     try {
         const baseURL = baseURLOverride || process.env.SYDLE_API_URL || 'https://cbmsa-dev.sydle.one/api/1';
         const url = `${baseURL}/main/sys/auth/signIn/ad5e36ead7ebfa3c9e7cef04c9`;
-        console.log('Login URL:', url);
-        console.log('Login Body:', { userLogin, userPassword });
         const response = await axios.post(
             url,
             {
