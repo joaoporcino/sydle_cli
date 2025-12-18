@@ -25,13 +25,18 @@ const obterPacoteCommand = new Command('obterPacote')
             // Query filtering by identifier
             const query = {
                 query: {
-                    term: { "identifier": identifier }
+                    term: { "package.identifier.keyword": identifier }
                 },
                 sort: [{ "_id": "asc" }]
             };
 
+            console.log('Search query:', JSON.stringify(query, null, 2));
+            let totalHits = 0;
             await searchPaginated(classId, query, 50, async (hits) => {
+                totalHits += hits.length;
+                console.log(`Found ${hits.length} results in this batch (total: ${totalHits})`);
                 for (const hit of hits) {
+                    console.log('Processing hit:', hit._id);
                     if (hit._source && hit._source) {
                         let _class = hit._source;
                         // Fetch full class to ensure we have all details including scripts
@@ -91,6 +96,7 @@ const obterPacoteCommand = new Command('obterPacote')
                 }
             });
 
+            console.log(`Search completed. Total hits processed: ${totalHits}`);
             console.log('Operation complete.');
 
         } catch (error) {
