@@ -14,9 +14,11 @@
   "description": "",
   "dependencies": {
     "axios": "^1.13.2",
+    "chokidar": "^5.0.0",
     "commander": "^14.0.2",
     "conf": "^10.2.0",
     "dotenv": "^17.2.3",
-    "inquirer": "^8.2.7"
+    "inquirer": "^8.2.7",
+    "zod": "^4.2.1"
   }
 }

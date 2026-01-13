@@ -1,0 +1,28 @@
+{
+    "compilerOptions": {
+        "module": "CommonJS",
+        "target": "ES6",
+        "checkJs": true,
+        "baseUrl": ".",
+        "paths": {
+            "@api/*": [
+                "src/api/*"
+            ],
+            "@utils/*": [
+                "src/utils/*"
+            ]
+        }
+    },
+    "include": [
+        "src/**/*",
+        "sydle-dev/**/*",
+        "sydle-hom/**/*",
+        "sydle-prod/**/*",
+        "typings/**/*.d.ts",
+        "index.js"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/node_modules/*"
+    ]
+}

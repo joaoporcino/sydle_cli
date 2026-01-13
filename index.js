@@ -5,6 +5,7 @@ const loginCommand = require('./src/commands/login');
 const initCommand = require('./src/commands/init');
 const mainCommand = require('./src/commands/main');
 const obterPacoteCommand = require('./src/commands/obterPacote');
+const watchCommand = require('./src/commands/watch');
 
 program
     .name("sydle")
@@ -13,6 +14,7 @@ program
     .addCommand(initCommand)
     .addCommand(loginCommand)
     .addCommand(mainCommand)
-    .addCommand(obterPacoteCommand);
+    .addCommand(obterPacoteCommand)
+    .addCommand(watchCommand);
 
 program.parse();
