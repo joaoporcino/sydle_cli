@@ -124,37 +124,12 @@ const obterClasseCommand = new Command('obterClasse')
                 fs.writeFileSync(path.join(classPath, 'class.json'), JSON.stringify(_class, null, 2));
 
                 const methods = (_class.methods || []);
-                methods.forEach(method => {
-                    const methodPath = path.join(classPath, method.identifier);
-
-                    if (!fs.existsSync(methodPath)) {
-                        fs.mkdirSync(methodPath, { recursive: true });
-                    }
-
-                    if (method.scripts && method.scripts.length > 0) {
-                        const scriptsFolderPath = path.join(methodPath, 'scripts');
-                        if (!fs.existsSync(scriptsFolderPath)) {
-                            fs.mkdirSync(scriptsFolderPath, { recursive: true });
-                        }
-
-                        method.scripts.forEach((scriptContent, index) => {
-                            if (scriptContent) {
-                                const scriptName = `script_${index + 1}.js`;
-                                const scriptPath = path.join(scriptsFolderPath, scriptName);
-                                fs.writeFileSync(scriptPath, scriptContent);
-                            }
-                        });
-                    }
-
-                    const jsonFilePath = path.join(methodPath, 'method.json');
-                    fs.writeFileSync(jsonFilePath, JSON.stringify(method, null, 2));
-                });
-
                 // Field mapping helpers
                 const mapToTsType = (field) => {
                     let type = 'any';
                     const baseType = field.type;
 
+                    // For REFERENCE fields, use the referenced class interface
                     if (baseType === 'REFERENCE' && field.refClass && field.refClass._id) {
                         const refClassName = classIdToIdentifier.get(field.refClass._id);
                         if (refClassName) {
@@ -174,11 +149,13 @@ const obterClasseCommand = new Command('obterClasse')
                 const mapToZodSchema = (field) => {
                     let schema = 'z.any()';
                     const baseType = field.type;
-                    if (['STRING', 'ID', 'REFERENCE', 'DATE'].includes(baseType)) {
+                    if (['STRING', 'ID', 'DATE'].includes(baseType)) {
                         schema = 'z.string()';
                         if (field.additionalConfigs && field.additionalConfigs.maxLength) {
                             schema += `.max(${field.additionalConfigs.maxLength})`;
                         }
+                    } else if (baseType === 'REFERENCE') {
+                        schema = 'z.object({ _id: z.string(), _classId: z.string() })';
                     } else if (baseType === 'BOOLEAN') {
                         schema = 'z.boolean()';
                     } else if (['INTEGER', 'DECIMAL'].includes(baseType)) {
@@ -192,6 +169,91 @@ const obterClasseCommand = new Command('obterClasse')
                     return schema;
                 };
 
+                // Helper to generate method files
+                const generateMethodFiles = (basePath, methods) => {
+                    if (!methods || methods.length === 0) return;
+
+                    methods.forEach(method => {
+                        const methodPath = path.join(basePath, method.identifier);
+
+                        if (!fs.existsSync(methodPath)) {
+                            fs.mkdirSync(methodPath, { recursive: true });
+                        }
+
+                        if (method.scripts && method.scripts.length > 0) {
+                            const scriptsFolderPath = path.join(methodPath, 'scripts');
+                            if (!fs.existsSync(scriptsFolderPath)) {
+                                fs.mkdirSync(scriptsFolderPath, { recursive: true });
+                            }
+
+                            method.scripts.forEach((scriptContent, index) => {
+                                if (scriptContent) {
+                                    const scriptName = `script_${index + 1}.js`;
+                                    const scriptPath = path.join(scriptsFolderPath, scriptName);
+                                    fs.writeFileSync(scriptPath, scriptContent);
+                                }
+                            });
+                        }
+
+                        const jsonFilePath = path.join(methodPath, 'method.json');
+                        fs.writeFileSync(jsonFilePath, JSON.stringify(method, null, 2));
+
+                        // Process inputParameters
+                        if (method.inputParameters) {
+                            const inputFolderPath = path.join(methodPath, '_input');
+                            if (!fs.existsSync(inputFolderPath)) {
+                                fs.mkdirSync(inputFolderPath, { recursive: true });
+                            }
+                            fs.writeFileSync(path.join(inputFolderPath, 'input.json'), JSON.stringify(method.inputParameters, null, 2));
+
+                            // Generate input.d.ts
+                            if (method.inputParameters.fields) {
+                                let dtsContent = `/**\n * Auto-generated types for input of ${method.identifier}\n */\n\n`;
+                                dtsContent += `export interface Input {\n`;
+                                method.inputParameters.fields.filter(f => !f.identifier.startsWith('_')).forEach(f => {
+                                    dtsContent += `    ${f.identifier}${f.required ? '' : '?'}: ${mapToTsType(f)};\n`;
+                                });
+                                dtsContent += `}\n`;
+                                fs.writeFileSync(path.join(inputFolderPath, 'input.d.ts'), dtsContent);
+
+                                // Generate input.schema.js
+                                let zodContent = `const { z } = require('zod');\n\n`;
+                                zodContent += `/**\n * Zod validation schema for input of ${method.identifier}\n */\n`;
+                                zodContent += `const InputSchema = z.object({\n`;
+                                method.inputParameters.fields.filter(f => !f.identifier.startsWith('_')).forEach(f => {
+                                    zodContent += `    ${f.identifier}: ${mapToZodSchema(f)},\n`;
+                                });
+                                zodContent += `});\n\n`;
+                                zodContent += `module.exports = { InputSchema };\n`;
+                                fs.writeFileSync(path.join(inputFolderPath, 'input.schema.js'), zodContent);
+                            }
+
+                            // Recursive generation for input methods
+                            if (method.inputParameters.methods) {
+                                generateMethodFiles(inputFolderPath, method.inputParameters.methods);
+                            }
+                        }
+
+                        // Process outputParameters
+                        if (method.outputParameters) {
+                            const outputFolderPath = path.join(methodPath, '_output');
+                            if (!fs.existsSync(outputFolderPath)) {
+                                fs.mkdirSync(outputFolderPath, { recursive: true });
+                            }
+                            fs.writeFileSync(path.join(outputFolderPath, 'output.json'), JSON.stringify(method.outputParameters, null, 2));
+
+                            // Recursive generation for output methods
+                            if (method.outputParameters.methods) {
+                                generateMethodFiles(outputFolderPath, method.outputParameters.methods);
+                            }
+                        }
+                    });
+                };
+
+                // Generate main class methods using the helper
+                generateMethodFiles(classPath, methods);
+
+                // Field mapping helpers
                 const fields = (_class.fields || []).filter(f => !f.identifier.startsWith('_'));
                 const dataInterfaceName = `I_Data_${_class.identifier}`;
                 const patchInterfaceName = `I_Patch_${_class.identifier}`;
@@ -327,9 +389,44 @@ const obterClasseCommand = new Command('obterClasse')
                 classDtsContent += `    _save(data: ${dataInterfaceName}): any;\n`;
                 classDtsContent += `    _search(query: ${searchQueryName}): I_ElasticSearchResult<${dataInterfaceName}>;\n`;
                 methods.forEach(m => {
-                    if (!['_create', '_createDraft', '_update', '_patch', '_save', '_search'].includes(m.identifier)) {
-                        classDtsContent += `    ${m.identifier}(data?: any): any;\n`;
+                    let methodSignature = `    ${m.identifier}(data?: any): any;\n`;
+
+                    // Generate specific input/output types if they exist
+                    if (m.inputParameters && m.inputParameters.fields && m.inputParameters.fields.length > 0) {
+                        const inputInterfaceName = `I_Input_${m.identifier}`;
+                        const inputFields = m.inputParameters.fields.filter(f => !f.identifier.startsWith('_'));
+                        if (inputFields.length > 0) {
+                            classDtsContent = `declare interface ${inputInterfaceName} {\n` +
+                                inputFields.map(f => `    ${f.identifier}${f.required ? '' : '?'}: ${mapToTsType(f)};`).join('\n') +
+                                `\n}\n\n` + classDtsContent;
+
+                            methodSignature = `    ${m.identifier}(data: ${inputInterfaceName}): `;
+                        } else {
+                            methodSignature = `    ${m.identifier}(data?: any): `;
+                        }
+                    } else if (!['_create', '_createDraft', '_update', '_patch', '_save', '_search'].includes(m.identifier)) {
+                        methodSignature = `    ${m.identifier}(data?: any): `;
+                    } else {
+                        // For standard methods, we keep existing signatures, handled below
+                        return;
                     }
+
+                    if (m.outputParameters && m.outputParameters.fields && m.outputParameters.fields.length > 0) {
+                        const outputInterfaceName = `I_Output_${m.identifier}`;
+                        const outputFields = m.outputParameters.fields.filter(f => !f.identifier.startsWith('_'));
+                        if (outputFields.length > 0) {
+                            classDtsContent = `declare interface ${outputInterfaceName} {\n` +
+                                outputFields.map(f => `    ${f.identifier}${f.required ? '' : '?'}: ${mapToTsType(f)};`).join('\n') +
+                                `\n}\n\n` + classDtsContent;
+                            methodSignature += `${outputInterfaceName};\n`;
+                        } else {
+                            methodSignature += `any;\n`;
+                        }
+                    } else {
+                        methodSignature += `any;\n`;
+                    }
+
+                    classDtsContent += methodSignature;
                 });
                 classDtsContent += `}\ndeclare var ${_class.identifier}: I_${_class.identifier};\n`;
                 fs.writeFileSync(path.join(classPath, 'class.d.ts'), classDtsContent);
