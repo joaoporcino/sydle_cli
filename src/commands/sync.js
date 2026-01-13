@@ -4,12 +4,15 @@ const fs = require('fs');
 const path = require('path');
 const { get, patch } = require('../api/main');
 const { ensureAuth } = require('../utils/authFlow');
+const { createLogger } = require('../utils/logger');
 
 const syncCommand = new Command('sync')
     .description('Sync local scripts to Sydle')
     .argument('[path]', 'Optional path: package.class.method, package.class, or package')
     .option('-v, --verbose', 'Show verbose logging')
     .action(async (syncPath, options) => {
+        const logger = createLogger(options.verbose);
+
         try {
             if (!(await ensureAuth())) {
                 return;
@@ -25,12 +28,12 @@ const syncCommand = new Command('sync')
             const rootPath = path.join(process.cwd(), rootFolder);
 
             if (!fs.existsSync(rootPath)) {
-                console.error(`❌ Directory not found: ${rootPath}`);
-                console.error(`   Run 'sydle init' or 'sydle obterPacote' first.`);
+                logger.error(`❌ Directory not found: ${rootPath}`);
+                logger.info(`   Run 'sydle init' or 'sydle obterPacote' first.`);
                 return;
             }
 
-            console.log('🔍 Scanning for methods to sync...\n');
+            logger.info('🔍 Scanning for methods to sync...\n');
 
             // Build glob pattern based on path
             let pattern = '**/method.json';
@@ -58,18 +61,18 @@ const syncCommand = new Command('sync')
             });
 
             if (methodFiles.length === 0) {
-                console.error(`❌ No methods found matching: ${syncPath || 'all'}`);
+                logger.error(`❌ No methods found matching: ${syncPath || 'all'}`);
                 return;
             }
 
-            console.log(`📦 Found ${methodFiles.length} method(s) to sync\n`);
+            logger.info(`📦 Found ${methodFiles.length} method(s) to sync\n`);
 
             let successCount = 0;
             let failCount = 0;
 
             // Sync each method
             for (const methodFile of methodFiles) {
-                const result = await syncMethod(path.join(rootPath, methodFile), classId, rootPath, options.verbose);
+                const result = await syncMethod(path.join(rootPath, methodFile), classId, rootPath, logger);
                 if (result.success) {
                     successCount++;
                 } else {
@@ -78,23 +81,23 @@ const syncCommand = new Command('sync')
             }
 
             // Summary
-            console.log('\n' + '='.repeat(50));
-            console.log(`✓ Successfully synced: ${successCount} method(s)`);
+            const summaryLines = [
+                `✓ Successfully synced: ${successCount} method(s)`
+            ];
             if (failCount > 0) {
-                console.log(`✗ Failed: ${failCount} method(s)`);
+                summaryLines.push(`✗ Failed: ${failCount} method(s)`);
             }
-            console.log('='.repeat(50));
+            logger.summary(summaryLines);
 
         } catch (error) {
-            console.error('❌ Sync command failed:', error.message);
+            logger.error('❌ Sync command failed: ' + error.message);
             if (options.verbose) {
-                console.error(error);
+                logger.debug(error.stack);
             }
         }
     });
 
-async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
-    const timestamp = new Date().toLocaleTimeString('pt-BR');
+async function syncMethod(methodJsonPath, classId, rootPath, logger) {
     const relativePath = path.relative(rootPath, methodJsonPath);
     const parts = relativePath.split(path.sep);
 
@@ -103,11 +106,8 @@ async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
     const className = parts[parts.length - 3];
 
     try {
-        if (verbose) {
-            console.log(`[${timestamp}] 🔄 Syncing: ${className}/${methodName}`);
-        } else {
-            console.log(`🔄 ${className}/${methodName}`);
-        }
+        logger.progress(`🔄 ${className}/${methodName}`);
+
 
         // Read method.json
         const methodData = JSON.parse(fs.readFileSync(methodJsonPath, 'utf-8'));
@@ -117,7 +117,7 @@ async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
         const scriptsFolder = path.join(methodFolder, 'scripts');
 
         if (!fs.existsSync(scriptsFolder)) {
-            console.log(`   ⚠ No scripts folder found`);
+            logger.warn(`   ⚠ No scripts folder found`);
             return { success: false };
         }
 
@@ -126,7 +126,7 @@ async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
             .sort();
 
         if (scriptFiles.length === 0) {
-            console.log(`   ⚠ No script files found`);
+            logger.warn(`   ⚠ No script files found`);
             return { success: false };
         }
 
@@ -148,7 +148,7 @@ async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
         const classJsonPath = path.join(classFolder, 'class.json');
 
         if (!fs.existsSync(classJsonPath)) {
-            console.log(`   ❌ class.json not found`);
+            logger.error(`   ❌ class.json not found`);
             return { success: false };
         }
 
@@ -158,13 +158,13 @@ async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
         // Get current class to find method index
         const currentClass = await get(classId, classRecordId);
         if (!currentClass || !currentClass.methods) {
-            console.log(`   ❌ Failed to fetch class data`);
+            logger.error(`   ❌ Failed to fetch class data`);
             return { success: false };
         }
 
         const methodIndex = currentClass.methods.findIndex(m => m.identifier === methodName);
         if (methodIndex === -1) {
-            console.log(`   ❌ Method not found in class`);
+            logger.error(`   ❌ Method not found in class`);
             return { success: false };
         }
 
@@ -180,14 +180,12 @@ async function syncMethod(methodJsonPath, classId, rootPath, verbose) {
 
         await patch(classId, updateData);
 
-        console.log(`   ✓ Synced (${scripts.length} script(s))`);
+        logger.success(`   ✓ Synced (${scripts.length} script(s))`);
         return { success: true };
 
     } catch (error) {
-        console.log(`   ❌ Failed: ${error.message}`);
-        if (verbose) {
-            console.error(error);
-        }
+        logger.error(`   ❌ Failed: ${error.message}`);
+        logger.debug(error.stack);
         return { success: false };
     }
 }

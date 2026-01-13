@@ -5,12 +5,15 @@ const fs = require('fs');
 const path = require('path');
 const { get, update } = require('../api/main');
 const { ensureAuth } = require('../utils/authFlow');
+const { createLogger } = require('../utils/logger');
 
 const watchCommand = new Command('watch')
     .description('Watch for script changes and auto-sync to Sydle')
     .argument('[package]', 'Optional package to watch (e.g., recursosHumanos)')
     .option('-v, --verbose', 'Show verbose logging')
     .action(async (packageFilter, options) => {
+        const logger = createLogger(options.verbose);
+
         try {
             if (!(await ensureAuth())) {
                 return;
@@ -26,8 +29,8 @@ const watchCommand = new Command('watch')
             const rootPath = path.join(process.cwd(), rootFolder);
 
             if (!fs.existsSync(rootPath)) {
-                console.error(`❌ Directory not found: ${rootPath}`);
-                console.error(`   Run 'sydle init' or 'sydle obterPacote' first to generate the folder structure.`);
+                logger.error(`❌ Directory not found: ${rootPath}`);
+                logger.info(`   Run 'sydle init' or 'sydle obterPacote' first to generate the folder structure.`);
                 return;
             }
 
@@ -39,9 +42,9 @@ const watchCommand = new Command('watch')
                 globPattern = `${packagePath}/**/scripts/script_*.js`;
             }
 
-            console.log('🔍 Starting file watcher...');
-            console.log(`📂 Base directory: ${rootPath}`);
-            console.log(`🔎 Searching for files...`);
+            logger.info('🔍 Starting file watcher...');
+            logger.log(`📂 Base directory: ${rootPath}`);
+            logger.info(`🔎 Searching for files...`);
 
             // Use glob to find all matching files first
             const files = await glob(globPattern, {
@@ -51,15 +54,15 @@ const watchCommand = new Command('watch')
             });
 
             if (files.length === 0) {
-                console.error(`❌ No script files found matching pattern: ${globPattern}`);
-                console.error(`   Directory: ${rootPath}`);
+                logger.error(`❌ No script files found matching pattern: ${globPattern}`);
+                logger.log(`   Directory: ${rootPath}`);
                 return;
             }
 
-            console.log(`✓ Found ${files.length} script files`);
+            logger.success(`✓ Found ${files.length} script files`);
             if (options.verbose) {
-                files.slice(0, 5).forEach(f => console.log(`  - ${f}`));
-                if (files.length > 5) console.log(`  ... and ${files.length - 5} more`);
+                files.slice(0, 5).forEach(f => logger.log(`  - ${f}`));
+                if (files.length > 5) logger.log(`  ... and ${files.length - 5} more`);
             }
 
             // Debounce timers
@@ -77,7 +80,7 @@ const watchCommand = new Command('watch')
             });
 
             watcher.on('ready', () => {
-                console.log(`\n💾 Watching ${files.length} files. Save any to sync automatically.\n`);
+                logger.success(`\n💾 Watching ${files.length} files. Save any to sync automatically.\n`);
             });
 
             watcher.on('change', async (relativePath) => {
@@ -91,30 +94,30 @@ const watchCommand = new Command('watch')
 
                 const timer = setTimeout(async () => {
                     debounceTimers.delete(filePath);
-                    await syncScript(filePath, classId, rootPath, options.verbose);
+                    await syncScript(filePath, classId, rootPath, logger);
                 }, 500);
 
                 debounceTimers.set(filePath, timer);
             });
 
             watcher.on('error', error => {
-                console.error('❌ Watcher error:', error);
+                logger.error('❌ Watcher error: ' + (error instanceof Error ? error.message : String(error)));
             });
 
             // Keep process alive
             process.on('SIGINT', () => {
-                console.log('\n👋 Stopping file watcher...');
+                logger.info('\n👋 Stopping file watcher...');
                 watcher.close();
                 process.exit(0);
             });
 
         } catch (error) {
-            console.error('❌ Watch command failed:', error.message);
+            logger.error('❌ Watch command failed: ' + (error instanceof Error ? error.message : String(error)));
+            logger.debug(error instanceof Error ? error.stack : undefined);
         }
     });
 
-async function syncScript(filePath, classId, rootPath, verbose) {
-    const timestamp = new Date().toLocaleTimeString('pt-BR');
+async function syncScript(filePath, classId, rootPath, logger) {
 
     try {
         // Parse file path to extract metadata
@@ -123,9 +126,7 @@ async function syncScript(filePath, classId, rootPath, verbose) {
 
         // Expected: package/parts.../className/methodName/scripts/script_N.js
         if (parts.length < 4 || parts[parts.length - 2] !== 'scripts') {
-            if (verbose) {
-                console.log(`[${timestamp}] ⚠ Skipped (invalid path): ${relativePath}`);
-            }
+            logger.warn(`⚠ Skipped (invalid path): ${relativePath}`);
             return;
         }
 
@@ -135,15 +136,11 @@ async function syncScript(filePath, classId, rootPath, verbose) {
 
         // Validate script filename
         if (!scriptFileName.match(/^script_\d+\.js$/)) {
-            if (verbose) {
-                console.log(`[${timestamp}] ⚠ Skipped (invalid filename): ${relativePath}`);
-            }
+            logger.warn(`⚠ Skipped (invalid filename): ${relativePath}`);
             return;
         }
 
-        if (verbose) {
-            console.log(`[${timestamp}] 🔄 Syncing: ${className}/${methodName}/${scriptFileName}`);
-        }
+        logger.progress(`🔄 Syncing: ${className}/${methodName}/${scriptFileName}`);
 
         // Get method folder and method.json path
         const methodFolder = path.dirname(path.dirname(filePath));
@@ -151,7 +148,7 @@ async function syncScript(filePath, classId, rootPath, verbose) {
         const scriptsFolder = path.join(methodFolder, 'scripts');
 
         if (!fs.existsSync(methodJsonPath)) {
-            console.log(`[${timestamp}] ❌ Failed: method.json not found for ${className}/${methodName}`);
+            logger.error(`❌ Failed: method.json not found for ${className}/${methodName}`);
             return;
         }
 
@@ -181,7 +178,7 @@ async function syncScript(filePath, classId, rootPath, verbose) {
         const classJsonPath = path.join(classFolder, 'class.json');
 
         if (!fs.existsSync(classJsonPath)) {
-            console.log(`[${timestamp}] ❌ class.json not found: ${className}`);
+            logger.error(`❌ class.json not found: ${className}`);
             return;
         }
 
@@ -191,13 +188,13 @@ async function syncScript(filePath, classId, rootPath, verbose) {
         // Get current class to find method index
         const currentClass = await get(classId, classRecordId);
         if (!currentClass || !currentClass.methods) {
-            console.log(`[${timestamp}] ❌ Failed: Class data not found`);
+            logger.error(`❌ Failed: Class data not found`);
             return;
         }
 
         const methodIndex = currentClass.methods.findIndex(m => m.identifier === methodName);
         if (methodIndex === -1) {
-            console.log(`[${timestamp}] ❌ Failed: Method '${methodName}' not found in class '${className}'`);
+            logger.error(`❌ Failed: Method '${methodName}' not found in class '${className}'`);
             return;
         }
 
@@ -214,13 +211,11 @@ async function syncScript(filePath, classId, rootPath, verbose) {
         const { patch } = require('../api/main');
         await patch(classId, updateData);
 
-        console.log(`[${timestamp}] ✓ Synced: ${className}/${methodName} (${scripts.length} script(s))`);
+        logger.success(`✓ Synced: ${className}/${methodName} (${scripts.length} script(s))`);
 
     } catch (error) {
-        console.log(`[${timestamp}] ❌ Failed: ${error.message}`);
-        if (verbose) {
-            console.error(error);
-        }
+        logger.error(`❌ Failed: ${error instanceof Error ? error.message : String(error)}`);
+        logger.debug(error instanceof Error ? error.stack : undefined);
     }
 }
 
