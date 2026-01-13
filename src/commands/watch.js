@@ -1,5 +1,6 @@
 const { Command } = require('commander');
 const chokidar = require('chokidar');
+const { glob } = require('glob');
 const fs = require('fs');
 const path = require('path');
 const { get, update } = require('../api/main');
@@ -30,21 +31,43 @@ const watchCommand = new Command('watch')
                 return;
             }
 
-            // Build watch pattern
-            let watchPattern = path.join(rootPath, '**', 'scripts', 'script_*.js');
+            // Build glob pattern to find script files
+            let globPattern = '**/scripts/script_*.js';
+
             if (packageFilter) {
-                const packagePath = packageFilter.split('.').join(path.sep);
-                watchPattern = path.join(rootPath, packagePath, '**', 'scripts', 'script_*.js');
+                const packagePath = packageFilter.split('.').join('/');
+                globPattern = `${packagePath}/**/scripts/script_*.js`;
             }
 
             console.log('🔍 Starting file watcher...');
-            console.log(`📂 Watching: ${watchPattern}`);
+            console.log(`📂 Base directory: ${rootPath}`);
+            console.log(`🔎 Searching for files...`);
+
+            // Use glob to find all matching files first
+            const files = await glob(globPattern, {
+                cwd: rootPath,
+                absolute: false,
+                nodir: true
+            });
+
+            if (files.length === 0) {
+                console.error(`❌ No script files found matching pattern: ${globPattern}`);
+                console.error(`   Directory: ${rootPath}`);
+                return;
+            }
+
+            console.log(`✓ Found ${files.length} script files`);
+            if (options.verbose) {
+                files.slice(0, 5).forEach(f => console.log(`  - ${f}`));
+                if (files.length > 5) console.log(`  ... and ${files.length - 5} more`);
+            }
 
             // Debounce timers
             const debounceTimers = new Map();
 
-            // Initialize watcher
-            const watcher = chokidar.watch(watchPattern, {
+            // Watch the found files explicitly
+            const watcher = chokidar.watch(files, {
+                cwd: rootPath,
                 persistent: true,
                 ignoreInitial: true,
                 awaitWriteFinish: {
@@ -54,14 +77,13 @@ const watchCommand = new Command('watch')
             });
 
             watcher.on('ready', () => {
-                const files = Object.keys(watcher.getWatched()).reduce((acc, dir) => {
-                    return acc + watcher.getWatched()[dir].length;
-                }, 0);
-                console.log(`✓ Ready! Monitoring ${files} script files.`);
-                console.log('💾 Save any script to sync automatically.\n');
+                console.log(`\n💾 Watching ${files.length} files. Save any to sync automatically.\n`);
             });
 
-            watcher.on('change', async (filePath) => {
+            watcher.on('change', async (relativePath) => {
+                // Construct absolute path (chokidar returns relative when using cwd)
+                const filePath = path.join(rootPath, relativePath);
+
                 // Debounce multiple rapid saves
                 if (debounceTimers.has(filePath)) {
                     clearTimeout(debounceTimers.get(filePath));
@@ -111,66 +133,88 @@ async function syncScript(filePath, classId, rootPath, verbose) {
         const methodName = parts[parts.length - 3];
         const className = parts[parts.length - 4];
 
-        // Extract script index (script_1.js -> 0, script_2.js -> 1)
-        const scriptMatch = scriptFileName.match(/script_(\d+)\.js$/);
-        if (!scriptMatch) {
+        // Validate script filename
+        if (!scriptFileName.match(/^script_\d+\.js$/)) {
             if (verbose) {
                 console.log(`[${timestamp}] ⚠ Skipped (invalid filename): ${relativePath}`);
             }
             return;
         }
-        const scriptIndex = parseInt(scriptMatch[1]) - 1; // Convert to 0-based index
 
-        // Read class.json to get class _id
-        const classFolder = path.dirname(path.dirname(path.dirname(filePath)));
+        if (verbose) {
+            console.log(`[${timestamp}] 🔄 Syncing: ${className}/${methodName}/${scriptFileName}`);
+        }
+
+        // Get method folder and method.json path
+        const methodFolder = path.dirname(path.dirname(filePath));
+        const methodJsonPath = path.join(methodFolder, 'method.json');
+        const scriptsFolder = path.join(methodFolder, 'scripts');
+
+        if (!fs.existsSync(methodJsonPath)) {
+            console.log(`[${timestamp}] ❌ Failed: method.json not found for ${className}/${methodName}`);
+            return;
+        }
+
+        // Read method.json
+        const methodData = JSON.parse(fs.readFileSync(methodJsonPath, 'utf-8'));
+
+        // Read all script files from the scripts folder
+        const scriptFiles = fs.readdirSync(scriptsFolder)
+            .filter(file => file.match(/^script_\d+\.js$/))
+            .sort(); // Ensure consistent order
+
+        // Read all scripts and update method.json
+        const scripts = [];
+        for (const scriptFile of scriptFiles) {
+            const scriptPath = path.join(scriptsFolder, scriptFile);
+            const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
+            scripts.push(scriptContent);
+        }
+
+        methodData.scripts = scripts;
+
+        // Write updated method.json
+        fs.writeFileSync(methodJsonPath, JSON.stringify(methodData, null, 4), 'utf-8');
+
+        // Read class.json to get class _id and method index
+        const classFolder = path.dirname(methodFolder);
         const classJsonPath = path.join(classFolder, 'class.json');
 
         if (!fs.existsSync(classJsonPath)) {
-            console.log(`[${timestamp}] ❌ class.json not found: ${className}/${methodName}`);
+            console.log(`[${timestamp}] ❌ class.json not found: ${className}`);
             return;
         }
 
         const classData = JSON.parse(fs.readFileSync(classJsonPath, 'utf-8'));
         const classRecordId = classData._id;
 
-        if (verbose) {
-            console.log(`[${timestamp}] 🔄 Syncing: ${className}/${methodName}/script_${scriptIndex + 1}.js`);
-        }
-
-        // Read script content
-        const scriptContent = fs.readFileSync(filePath, 'utf-8');
-
-        // Get current class data
+        // Get current class to find method index
         const currentClass = await get(classId, classRecordId);
-
         if (!currentClass || !currentClass.methods) {
             console.log(`[${timestamp}] ❌ Failed: Class data not found`);
             return;
         }
 
-        // Find the method
         const methodIndex = currentClass.methods.findIndex(m => m.identifier === methodName);
         if (methodIndex === -1) {
             console.log(`[${timestamp}] ❌ Failed: Method '${methodName}' not found in class '${className}'`);
             return;
         }
 
-        // Update the scripts array
-        if (!currentClass.methods[methodIndex].scripts) {
-            currentClass.methods[methodIndex].scripts = [];
-        }
-
-        currentClass.methods[methodIndex].scripts[scriptIndex] = scriptContent;
-
-        // Update the class
+        // Patch with full method object
         const updateData = {
             _id: classRecordId,
-            methods: currentClass.methods
+            _operationsList: [{
+                op: 'replace',
+                path: `/methods/${methodIndex}`,
+                value: methodData
+            }]
         };
 
-        await update(classId, updateData);
+        const { patch } = require('../api/main');
+        await patch(classId, updateData);
 
-        console.log(`[${timestamp}] ✓ Synced: ${className}/${methodName}/script_${scriptIndex + 1}.js`);
+        console.log(`[${timestamp}] ✓ Synced: ${className}/${methodName} (${scripts.length} script(s))`);
 
     } catch (error) {
         console.log(`[${timestamp}] ❌ Failed: ${error.message}`);
