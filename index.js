@@ -5,6 +5,7 @@ const loginCommand = require('./src/commands/login');
 const initCommand = require('./src/commands/init');
 const mainCommand = require('./src/commands/main');
 const obterPacoteCommand = require('./src/commands/obterPacote');
+const obterClasseCommand = require('./src/commands/obterClasse');
 const watchCommand = require('./src/commands/watch');
 const syncCommand = require('./src/commands/sync');
 
@@ -16,6 +17,7 @@ program
     .addCommand(loginCommand)
     .addCommand(mainCommand)
     .addCommand(obterPacoteCommand)
+    .addCommand(obterClasseCommand)
     .addCommand(watchCommand)
     .addCommand(syncCommand);
 
