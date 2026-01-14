@@ -1,4 +1,4 @@
-const client = require('./client');
+const { client } = require('./client');
 
 /**
  * Executes a specific method on a Sydle class.
