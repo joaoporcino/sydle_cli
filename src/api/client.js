@@ -1,4 +1,4 @@
-const axios = require('axios');
+const axios = require('axios').default;
 const config = require('../utils/config');
 
 const client = axios.create({
@@ -22,4 +22,15 @@ client.interceptors.request.use(
     }
 );
 
-module.exports = client;
+// Factory for isolated clients (e.g. for multi-env compare)
+const createClient = (baseURL, token) => {
+    return axios.create({
+        baseURL: baseURL,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : undefined
+        }
+    });
+};
+
+module.exports = { client, createClient };

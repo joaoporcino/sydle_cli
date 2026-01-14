@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { get, patch } = require('../api/main');
 const { ensureAuth } = require('../utils/authFlow');
+const config = require('../utils/config');
 const { createLogger } = require('../utils/logger');
 
 const syncCommand = new Command('sync')
@@ -16,6 +17,19 @@ const syncCommand = new Command('sync')
         try {
             if (!(await ensureAuth())) {
                 return;
+            }
+
+            // Ensure the main token matches the current env URL if available in envTokens
+            const currentUrl = process.env.SYDLE_API_URL;
+            if (currentUrl) {
+                const envTokens = config.get('envTokens') || {};
+                const specificToken = envTokens[currentUrl];
+                const currentToken = config.get('token');
+
+                if (specificToken && specificToken !== currentToken) {
+                    config.set('token', specificToken);
+                    logger.info(`🔑 Switched to stored authentication token for ${currentUrl}`);
+                }
             }
 
             const classId = '000000000000000000000000';

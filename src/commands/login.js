@@ -5,10 +5,11 @@ const loginCommand = new Command('login')
     .description('Login to the Sydle CLI')
     .argument('[username]', 'Your username')
     .argument('[password]', 'Your password')
-    .action(async (username, password) => {
+    .argument('[url]', 'Target environment URL')
+    .action(async (username, password, url) => {
         try {
             if (username && password) {
-                await performLogin(username, password);
+                await performLogin(username, password, url);
             } else {
                 await ensureAuth(true);
             }

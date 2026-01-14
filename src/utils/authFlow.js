@@ -8,7 +8,16 @@ const performLogin = async (username, password, url) => {
     if (url) {
         setEnvValue('SYDLE_API_URL', url);
         process.env.SYDLE_API_URL = url;
-        console.log('Configuration saved to .env');
+
+        // Auto-detect and save specific environment URL
+        let envKey = 'SYDLE_URL_PROD';
+        if (url.includes('-dev') || url.includes('/dev')) envKey = 'SYDLE_URL_DEV';
+        else if (url.includes('-hom') || url.includes('/hom')) envKey = 'SYDLE_URL_HOM';
+
+        setEnvValue(envKey, url);
+        process.env[envKey] = url;
+
+        console.log(`Configuration saved to .env (SYDLE_API_URL and ${envKey})`);
     }
 
     console.log('Logging in...');
@@ -16,6 +25,15 @@ const performLogin = async (username, password, url) => {
 
     if (data.accessToken && data.accessToken.token) {
         config.set('token', data.accessToken.token);
+
+        // Store token in envTokens map
+        const tokenUrl = url || process.env.SYDLE_API_URL;
+        if (tokenUrl) {
+            const envTokens = config.get('envTokens') || {};
+            envTokens[tokenUrl] = data.accessToken.token;
+            config.set('envTokens', envTokens);
+        }
+
         console.log('Login successful! Token saved.');
         return true;
     } else {
@@ -32,13 +50,34 @@ const ensureAuth = async (force = false) => {
         return true;
     }
 
+    // 1. Ask for environment
+    const envChoices = ['dev', 'hom', 'prod', 'custom'];
+    const { environment } = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'environment',
+            message: 'Select the environment:',
+            choices: envChoices
+        }
+    ]);
+
+    // 2. Resolve URL based on environment
+    let selectedUrl = null;
+    if (environment !== 'custom') {
+        const envVarName = `SYDLE_URL_${environment.toUpperCase()}`;
+        if (process.env[envVarName]) {
+            selectedUrl = process.env[envVarName];
+            console.log(`Using stored URL for ${environment}: ${selectedUrl}`);
+        }
+    }
+
     const answers = await inquirer.prompt([
         {
             type: 'input',
             name: 'url',
             message: 'Enter the API Base URL:',
-            default: process.env.SYDLE_API_URL || 'https://cbmsa-dev.sydle.one/api/1',
-            when: !url
+            default: selectedUrl || process.env.SYDLE_API_URL || 'https://cbmsa-dev.sydle.one/api/1',
+            when: !selectedUrl // Only ask if we didn't find it in env vars OR user selected custom/override
         },
         {
             type: 'input',
@@ -52,8 +91,8 @@ const ensureAuth = async (force = false) => {
         }
     ]);
 
-    // If URL was prompted, use it. Otherwise use existing.
-    const finalUrl = answers.url || url;
+    // If URL was prompted, use it. Otherwise use the one we looked up.
+    const finalUrl = answers.url || selectedUrl || url;
 
     return await performLogin(answers.username, answers.password, finalUrl);
 };
