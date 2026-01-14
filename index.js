@@ -6,6 +6,7 @@ const initCommand = require('./src/commands/init');
 const mainCommand = require('./src/commands/main');
 const obterPacoteCommand = require('./src/commands/obterPacote');
 const obterClasseCommand = require('./src/commands/obterClasse');
+const compareCommand = require('./src/commands/compare');
 const watchCommand = require('./src/commands/watch');
 const syncCommand = require('./src/commands/sync');
 
@@ -18,6 +19,7 @@ program
     .addCommand(mainCommand)
     .addCommand(obterPacoteCommand)
     .addCommand(obterClasseCommand)
+    .addCommand(compareCommand)
     .addCommand(watchCommand)
     .addCommand(syncCommand);
 
