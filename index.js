@@ -9,6 +9,7 @@ const obterClasseCommand = require('./src/commands/obterClasse');
 const compareCommand = require('./src/commands/compare');
 const watchCommand = require('./src/commands/watch');
 const syncCommand = require('./src/commands/sync');
+const obterInstanciaCommand = require('./src/commands/obterInstancia');
 
 program
     .name("sydle")
@@ -21,6 +22,7 @@ program
     .addCommand(obterClasseCommand)
     .addCommand(compareCommand)
     .addCommand(watchCommand)
-    .addCommand(syncCommand);
+    .addCommand(syncCommand)
+    .addCommand(obterInstanciaCommand);
 
 program.parse();
