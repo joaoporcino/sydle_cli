@@ -158,7 +158,11 @@ async function syncScript(filePath, classId, rootPath, logger) {
         // Read all script files from the scripts folder
         const scriptFiles = fs.readdirSync(scriptsFolder)
             .filter(file => file.match(/^script_\d+\.js$/))
-            .sort(); // Ensure consistent order
+            .sort((a, b) => {
+                const numA = parseInt(a.match(/script_(\d+)\.js/)[1], 10);
+                const numB = parseInt(b.match(/script_(\d+)\.js/)[1], 10);
+                return numA - numB;
+            });
 
         // Read all scripts and update method.json
         const scripts = [];

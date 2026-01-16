@@ -137,7 +137,11 @@ async function syncMethod(methodJsonPath, classId, rootPath, logger) {
 
         const scriptFiles = fs.readdirSync(scriptsFolder)
             .filter(file => file.match(/^script_\d+\.js$/))
-            .sort();
+            .sort((a, b) => {
+                const numA = parseInt(a.match(/script_(\d+)\.js/)[1], 10);
+                const numB = parseInt(b.match(/script_(\d+)\.js/)[1], 10);
+                return numA - numB;
+            });
 
         if (scriptFiles.length === 0) {
             logger.warn(`   ⚠ No script files found`);
