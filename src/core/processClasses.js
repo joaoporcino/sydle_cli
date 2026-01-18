@@ -1,9 +1,11 @@
 /**
- * Core logic for fetching and processing Sydle classes
- * Shared by init, obterPacote, and obterClasse commands
+ * Core logic for processing Sydle classes
+ * Shared by init, obterPacote, obterClasse and criarClasse commands
+ * 
+ * Receives an array of class objects and generates all necessary files.
  */
 
-const { searchPaginated, get } = require('../api/main');
+const { get } = require('../api/main');
 const fs = require('fs');
 const path = require('path');
 const {
@@ -19,37 +21,38 @@ const {
 } = require('../generators');
 
 /**
- * Process classes from Sydle API and generate all necessary files
- * @param {Object} options - Processing options
- * @param {Object} options.query - Elasticsearch query to filter classes
- * @param {string} options.description - Description for logging (e.g., "Fetching package X")
+ * Process an array of classes and generate all necessary files
+ * @param {Object[]} classesData - Array of class objects to process
+ * @param {Object} [options] - Processing options
+ * @param {string} [options.description] - Description for logging
  * @returns {Promise<Object>} Processing results
  */
-async function processClasses(options) {
-    const { query, description } = options;
+async function processClasses(classesData, options = {}) {
+    const { description } = options;
 
-    let url = process.env.SYDLE_API_URL;
-
-    // Perform search and create folders
     console.log(description || 'Processing classes...');
+
     const classId = '000000000000000000000000';
     const classPakageId = '000000000000000000000015';
 
-    console.log('Search query:', JSON.stringify(query, null, 2));
-    let totalHits = 0;
-    const packageInfoMap = new Map();
-
-    // Phase 0: Load existing classes from previously downloaded packages
-    const classIdToIdentifier = new Map();
-    const allClassesData = [];
-
-    console.log('Phase 0: Loading existing classes from other packages...');
+    let url = process.env.SYDLE_API_URL;
     let env = 'prod';
     if (url.includes('dev')) env = 'dev';
     else if (url.includes('hom')) env = 'hom';
     const rootFolder = `sydle-${env}`;
     const rootPath = path.join(process.cwd(), rootFolder);
 
+    // Ensure root folder exists
+    if (!fs.existsSync(rootPath)) {
+        fs.mkdirSync(rootPath, { recursive: true });
+    }
+
+    const packageInfoMap = new Map();
+
+    // Phase 0: Load existing classes from previously downloaded packages
+    const classIdToIdentifier = new Map();
+
+    console.log('Phase 0: Loading existing classes from other packages...');
     if (fs.existsSync(rootPath)) {
         const loadClassesRecursively = (dir) => {
             const items = fs.readdirSync(dir);
@@ -58,7 +61,6 @@ async function processClasses(options) {
                 const stat = fs.statSync(itemPath);
 
                 if (stat.isDirectory()) {
-                    // Check if this directory has a class.json
                     const classJsonPath = path.join(itemPath, 'class.json');
                     if (fs.existsSync(classJsonPath)) {
                         try {
@@ -68,7 +70,6 @@ async function processClasses(options) {
                             // Silently skip malformed files
                         }
                     }
-                    // Recursively check subdirectories
                     loadClassesRecursively(itemPath);
                 }
             }
@@ -78,30 +79,15 @@ async function processClasses(options) {
         console.log(`Loaded ${classIdToIdentifier.size} existing classes from other packages.`);
     }
 
-    console.log('Phase 1: Collecting all classes...');
-    await searchPaginated(classId, query, 50, async (hits) => {
-        totalHits += hits.length;
-        console.log(`Found ${hits.length} results in this batch (total: ${totalHits})`);
-        for (const hit of hits) {
-            console.log('Processing hit:', hit._id);
-            if (hit._source && hit._source) {
-                let _class = hit._source;
-                // Fetch full class to ensure we have all details including scripts
-                try {
-                    _class = await get(classId, _class._id);
-                } catch (error) {
-                    console.error(`Failed to fetch full class ${_class._id}, using search result.`);
-                }
-
-                // Store in map for reference resolution
-                classIdToIdentifier.set(_class._id, _class.identifier);
-                allClassesData.push(_class);
-            }
+    // Add new classes to the map
+    for (const _class of classesData) {
+        if (_class._id && _class.identifier) {
+            classIdToIdentifier.set(_class._id, _class.identifier);
         }
-    });
+    }
 
-    console.log('Phase 2: Generating files for each class...');
-    for (const _class of allClassesData) {
+    console.log(`Phase 1: Processing ${classesData.length} classes...`);
+    for (const _class of classesData) {
         console.log(`Generating files for class: ${_class.identifier}`);
 
         try {
@@ -151,27 +137,26 @@ async function processClasses(options) {
         }
     }
 
-    // Phase 3: Generate package.d.ts for each package
-    console.log('Phase 3: Generating package.d.ts files...');
+    // Phase 2: Generate package.d.ts for each package
+    console.log('Phase 2: Generating package.d.ts files...');
     for (const [packagePath, packageInfo] of packageInfoMap.entries()) {
         generatePackageDts(packageInfo, packagePath);
         console.log(`Generated package.d.ts in ${packagePath}`);
     }
 
-    // Phase 4: Generate globals.d.ts, sydle.d.ts and sydleZod.js
-    console.log('Phase 4: Generating globals.d.ts, sydle.d.ts and sydleZod.js...');
+    // Phase 3: Generate globals.d.ts, sydle.d.ts and sydleZod.js
+    console.log('Phase 3: Generating globals.d.ts, sydle.d.ts and sydleZod.js...');
     generateGlobalsDts(rootPath);
     generateSydleDts(process.cwd());
     generateSydleZod(rootPath);
     generateAiDocs(process.cwd());
 
-    console.log(`Search completed. Total hits processed: ${totalHits}`);
+    console.log(`Processing completed. Total classes processed: ${classesData.length}`);
     console.log('Operation complete.');
 
     return {
-        totalHits,
         packagesGenerated: packageInfoMap.size,
-        classesGenerated: allClassesData.length
+        classesGenerated: classesData.length
     };
 }
 

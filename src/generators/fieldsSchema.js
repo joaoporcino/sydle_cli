@@ -1,15 +1,69 @@
 /**
- * Generator for fields.js files
- * Creates Sydle Schema files from class.json fields using sy.section().name().type() syntax
+ * @fileoverview Generator for fields.js schema files
+ * 
+ * This module generates `fields.js` files for each Sydle class,
+ * converting the raw field definitions from `class.json` into
+ * a fluent API syntax using the `sy` schema builder.
+ * 
+ * @module generators/fieldsSchema
+ * @requires fs
+ * @requires path
+ * 
+ * @example
+ * // Usage in processClasses.js
+ * const { generateFieldsSchema } = require('./fieldsSchema');
+ * generateFieldsSchema(classData, classDir, rootPath);
+ * 
+ * @example
+ * // Generated output example (fields.js):
+ * const { sy } = require('../../../typings/sydleZod');
+ * module.exports = {
+ *     nome: sy.section('Campos').name('Nome').type('STRING').required().searchable(),
+ *     idade: sy.section('Dados').name('Idade').type('INTEGER').relevancy('COMMON')
+ * };
  */
 
 const fs = require('fs');
 const path = require('path');
 
 /**
- * Map a Sydle field to sy builder chain
+ * Maps a Sydle field definition to an `sy` builder chain string.
+ * 
+ * Converts a raw field object from `class.json` into the fluent API syntax
+ * used by the `sydleZod` schema builder. Handles all field properties including:
+ * - Basic properties: section, name, type, identifier
+ * - Boolean flags: required, readOnly, hidden, searchable, multiple, unique, etc.
+ * - Reference configurations: refClass, embedded
+ * - Calculated fields: valueExpression, engine, calculationStrategy
+ * - Exhibition settings: size, breakLine
+ * 
  * @param {Object} field - Field object from class.json
- * @returns {string} sy chain code
+ * @param {string} field.identifier - Unique field identifier (e.g., 'nome', 'idade')
+ * @param {string} field.name - Display name of the field
+ * @param {string} field.type - Field type ('STRING', 'INTEGER', 'REFERENCE', etc.)
+ * @param {string} [field.section='Campos'] - Section where the field belongs
+ * @param {boolean} [field.required] - Whether the field is required
+ * @param {boolean} [field.readOnly] - Whether the field is read-only
+ * @param {boolean} [field.searchable] - Whether the field is searchable
+ * @param {Object} [field.refClass] - Reference class info for REFERENCE types
+ * @param {Object} [field.exhibitionConfigs] - UI display configurations
+ * @returns {string} The `sy` builder chain code as a string
+ * 
+ * @example
+ * // Input field object
+ * const field = {
+ *     identifier: 'nome',
+ *     name: 'Nome',
+ *     type: 'STRING',
+ *     section: 'Dados Pessoais',
+ *     required: true,
+ *     searchable: true,
+ *     exhibitionConfigs: { size: 'md' }
+ * };
+ * 
+ * // Output
+ * mapFieldToSy(field);
+ * // Returns: "sy.section('Dados Pessoais').name('Nome').type('STRING').required().searchable().size('md')"
  */
 function mapFieldToSy(field) {
     const chains = [];
@@ -90,10 +144,36 @@ function mapFieldToSy(field) {
 }
 
 /**
- * Generate fields.js with sy schema syntax
+ * Generates a `fields.js` file with the `sy` schema syntax.
+ * 
+ * Creates a JavaScript file that exports a schema object using the fluent API
+ * provided by `sydleZod`. The generated file can be used for field validation,
+ * documentation, and IDE IntelliSense support.
+ * 
+ * System fields (identifiers starting with `_`) are automatically filtered out.
+ * If a class has no custom fields, the file generation is skipped.
+ * 
  * @param {Object} classData - Class object from Sydle API
- * @param {string} outputPath - Path to write the fields.js file
- * @param {string} [rootPath] - Root project path to calculate relative import
+ * @param {string} classData.identifier - Unique class identifier
+ * @param {string} [classData.name] - Display name of the class
+ * @param {Array<Object>} [classData.fields] - Array of field definitions
+ * @param {string} outputPath - Directory path to write the `fields.js` file
+ * @param {string} [rootPath] - Root project path to calculate relative import path
+ * 
+ * @example
+ * // Generate fields.js for a class
+ * const classData = {
+ *     identifier: 'Funcionario',
+ *     name: 'Funcionário',
+ *     fields: [
+ *         { identifier: 'nome', name: 'Nome', type: 'STRING', required: true },
+ *         { identifier: '_id', name: 'ID', type: 'ID' } // Will be filtered out
+ *     ]
+ * };
+ * generateFieldsSchema(classData, 'C:/project/sydle-dev/rh/Funcionario', 'C:/project');
+ * // Creates: C:/project/sydle-dev/rh/Funcionario/fields.js
+ * 
+ * @returns {void}
  */
 function generateFieldsSchema(classData, outputPath, rootPath) {
     // Filter out system fields (starting with _)
@@ -115,8 +195,8 @@ function generateFieldsSchema(classData, outputPath, rootPath) {
 
     let content = `/**
  * Sydle Schema - ${classData.name || classData.identifier}
- * Auto-generated from class.json
- * @see class.json
+ * Auto-generated from the schema definition file.
+ * Reference: class.json
  */
 
 const { sy } = require('${sydleZodPath}');

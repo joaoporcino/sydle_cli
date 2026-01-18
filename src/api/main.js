@@ -119,4 +119,26 @@ const update = async (classId, updateData) => {
     return await executeMainMethod(classId, "_update", updateData, 'POST');
 };
 
-module.exports = { executeMainMethod, searchPaginated, get, patch, update };
+/**
+ * Creates a draft record for a class (gets template with default values).
+ * 
+ * @param {string} classId - The class ID to create draft for.
+ * @param {Object} [initialData={}] - Initial data to populate the draft.
+ * @returns {Promise<any>} The draft record with default values.
+ */
+const createDraft = async (classId, initialData = {}) => {
+    return await executeMainMethod(classId, "_createDraft", initialData, 'POST');
+};
+
+/**
+ * Creates a new record.
+ * 
+ * @param {string} classId - The class ID.
+ * @param {Object} data - The record data to create.
+ * @returns {Promise<any>} The created record data.
+ */
+const create = async (classId, data) => {
+    return await executeMainMethod(classId, "_create", data, 'POST');
+};
+
+module.exports = { executeMainMethod, searchPaginated, get, patch, update, createDraft, create };

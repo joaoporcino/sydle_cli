@@ -12,6 +12,7 @@ const syncCommand = require('./src/commands/sync');
 const createMethodCommand = require('./src/commands/createMethod');
 const deleteMethodCommand = require('./src/commands/deleteMethod');
 const obterInstanciaCommand = require('./src/commands/getInstance');
+const createClassCommand = require('./src/commands/createClass');
 
 program
     .name("sydle")
@@ -27,6 +28,7 @@ program
     .addCommand(syncCommand)
     .addCommand(createMethodCommand)
     .addCommand(deleteMethodCommand)
-    .addCommand(obterInstanciaCommand);
+    .addCommand(obterInstanciaCommand)
+    .addCommand(createClassCommand);
 
 program.parse();

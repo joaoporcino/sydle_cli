@@ -8,6 +8,7 @@ const { ensureAuth } = require('../utils/authFlow');
 const { createLogger } = require('../utils/logger');
 const { scaffoldMethod } = require('../utils/scaffoldMethod');
 const { handleMethodDeletion } = require('../utils/deleteMethod');
+const { syncFieldsCore } = require('../core/syncFields');
 
 const watchCommand = new Command('monitorar')
     .alias('watch')
@@ -37,12 +38,14 @@ const watchCommand = new Command('monitorar')
                 return;
             }
 
-            // Build glob pattern to find script files
-            let globPattern = '**/scripts/script_*.js';
+            // Build glob patterns
+            let scriptGlobPattern = '**/scripts/script_*.js';
+            let fieldsGlobPattern = '**/fields.js';
 
             if (packageFilter) {
                 const packagePath = packageFilter.split('.').join('/');
-                globPattern = `${packagePath}/**/scripts/script_*.js`;
+                scriptGlobPattern = `${packagePath}/**/scripts/script_*.js`;
+                fieldsGlobPattern = `${packagePath}/**/fields.js`;
             }
 
             logger.info('🔍 Starting file watcher...');
@@ -50,32 +53,41 @@ const watchCommand = new Command('monitorar')
             logger.info(`🔎 Searching for files...`);
 
             // Use glob to find all matching files first
-            const files = await glob(globPattern, {
+            const scriptFiles = await glob(scriptGlobPattern, {
                 cwd: rootPath,
                 absolute: false,
                 nodir: true
             });
 
-            if (files.length === 0) {
-                logger.error(`❌ No script files found matching pattern: ${globPattern}`);
+            const fieldsFiles = await glob(fieldsGlobPattern, {
+                cwd: rootPath,
+                absolute: false,
+                nodir: true
+            });
+
+            if (scriptFiles.length === 0 && fieldsFiles.length === 0) {
+                logger.error(`❌ No script or fields files found`);
                 logger.log(`   Directory: ${rootPath}`);
                 return;
             }
 
-            logger.success(`✓ Found ${files.length} script files`);
+            logger.success(`✓ Found ${scriptFiles.length} script files, ${fieldsFiles.length} fields.js files`);
             if (options.verbose) {
-                files.slice(0, 5).forEach(f => logger.log(`  - ${f}`));
-                if (files.length > 5) logger.log(`  ... and ${files.length - 5} more`);
+                scriptFiles.slice(0, 3).forEach(f => logger.log(`  📜 ${f}`));
+                fieldsFiles.slice(0, 3).forEach(f => logger.log(`  📋 ${f}`));
+                const total = scriptFiles.length + fieldsFiles.length;
+                if (total > 6) logger.log(`  ... and ${total - 6} more`);
             }
 
             // Debounce timers
             const debounceTimers = new Map();
+            const fieldsDebounceTimers = new Map();
 
-            // Watch the found files explicitly
-            // Watch the glob pattern explicitly to support new files AND directories
+            // Watch the glob patterns to support new files AND directories
             const watcher = chokidar.watch([
-                globPattern, // scripts
-                rootPath // directories
+                scriptGlobPattern,
+                fieldsGlobPattern,
+                rootPath
             ], {
                 cwd: rootPath,
                 persistent: true,
@@ -94,7 +106,8 @@ const watchCommand = new Command('monitorar')
             });
 
             watcher.on('ready', () => {
-                logger.success(`\n💾 Watching ${files.length} files. Save any to sync automatically.\n`);
+                const totalFiles = scriptFiles.length + fieldsFiles.length;
+                logger.success(`\n💾 Watching ${totalFiles} files. Save any to sync automatically.\n`);
             });
 
             const handleFileChange = async (relativePath) => {
@@ -123,6 +136,31 @@ const watchCommand = new Command('monitorar')
 
             watcher.on('change', handleFileChange);
             watcher.on('add', handleFileChange);
+
+            // Handler for fields.js changes
+            const handleFieldsChange = async (relativePath) => {
+                const filePath = path.join(rootPath, relativePath);
+
+                // Only process files named exactly 'fields.js'
+                if (!filePath.endsWith('fields.js')) {
+                    return;
+                }
+
+                // Debounce multiple rapid saves
+                if (fieldsDebounceTimers.has(filePath)) {
+                    clearTimeout(fieldsDebounceTimers.get(filePath));
+                }
+
+                const timer = setTimeout(async () => {
+                    fieldsDebounceTimers.delete(filePath);
+                    await syncFieldsCore(filePath, classId, rootPath, logger);
+                }, 500);
+
+                fieldsDebounceTimers.set(filePath, timer);
+            };
+
+            watcher.on('change', handleFieldsChange);
+            watcher.on('add', handleFieldsChange);
 
             // Handle directory creation for scaffolding
             watcher.on('addDir', async (dirPath) => {
