@@ -3,7 +3,8 @@ const { ensureAuth } = require('../utils/authFlow');
 const { processClasses } = require('../core/processClasses');
 
 const obterClasseCommand = new Command('obterClasse')
-    .description('Fetch and generate files for a specific class identifier')
+    .alias('getClass')
+    .description('Obter classe do Sydle')
     .argument('<identifier>', 'Class identifier')
     .action(async (identifier) => {
         try {

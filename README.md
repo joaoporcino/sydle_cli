@@ -42,9 +42,11 @@ sydle login <usuario> <senha>
 sydle login <usuario> <senha> <url>
 ```
 
-#### Inicializar (Init)
+#### Iniciar (Init)
 Configura o ambiente e baixa a estrutura de classes base.
 ```bash
+sydle iniciar
+# Alias:
 sydle init
 ```
 
@@ -52,6 +54,8 @@ sydle init
 Baixa a estrutura de arquivos para um pacote específico.
 ```bash
 sydle obterPacote <identificador_do_pacote>
+# Alias:
+sydle getPackage <id>
 # Exemplo:
 sydle obterPacote com.sydle.one.sybox.Sybox
 ```
@@ -60,14 +64,40 @@ sydle obterPacote com.sydle.one.sybox.Sybox
 Baixa e gera arquivos para uma classe específica.
 ```bash
 sydle obterClasse <identificador_da_classe>
+# Alias:
+sydle getClass <id>
 # Exemplo:
 sydle obterClasse com.sydle.one.sybox.Sybox.MyClass
+```
+
+#### Criar Método (Create Method)
+Cria a estrutura de um novo método (scaffolding).
+```bash
+sydle criarMetodo [pacote] [classe] [metodo]
+# Exemplo (Interativo):
+sydle criarMetodo
+# Exemplo (Direto):
+sydle criarMetodo recursosHumanos Aprendiz novoMetodo
+# Alias:
+sydle createMethod ...
+```
+
+#### Excluir Método (Delete Method)
+Exclui a pasta local e remove do Sydle (com confirmação).
+```bash
+sydle excluirMetodo [pacote] [classe] [metodo]
+# Exemplo:
+sydle excluirMetodo recursosHumanos Aprendiz metodoAntigo
+# Alias:
+sydle deleteMethod ...
 ```
 
 #### Executar Método (Main)
 Executa um método genérico na API.
 ```bash
-sydle main <id> <metodo> --data <json> --http-method <POST|GET>
+sydle executar <id> <metodo> --data <json> --http-method <POST|GET>
+# Alias:
+sydle main ...
 ```
 
 #### Comparar Código (Compare)
@@ -75,31 +105,31 @@ Compara o código de um método entre dois ambientes (dev, hom, prod).
 Se os argumentos não forem fornecidos, um modo interativo será iniciado.
 Também automatiza o merge utilizando o VS Code se disponível.
 ```bash
-sydle compare [classIdentifier] [methodIdentifier] [sourceEnv] [targetEnv]
-# Exemplo:
+sydle comparar [classIdentifier] [methodIdentifier] [sourceEnv] [targetEnv]
+# Alias:
 sydle compare com.MyClass myMethod dev hom
 ```
 
-#### Watch
+#### Monitorar (Watch)
 Monitora alterações em scripts locais e sincroniza automaticamente com o Sydle.
 ```bash
+sydle monitorar [package]
+# Alias:
 sydle watch [package]
-# Exemplo (monitorar tudo):
-sydle watch
-# Exemplo (filtrar por pacote):
-sydle watch recursosHumanos
+# Exemplo:
+sydle monitorar recursosHumanos
 ```
 Opções:
 * `-v, --verbose`: Exibir logs detalhados.
 
-#### Sync
+#### Sincronizar (Sync)
 Sincroniza scripts locais para o Sydle sob demanda.
 ```bash
+sydle sincronizar [path]
+# Alias:
 sydle sync [path]
 # Exemplos:
-sydle sync                           # Sincroniza tudo
-sydle sync recursosHumanos           # Sincroniza pacote
-sydle sync recursosHumanos.MyClass   # Sincroniza classe
+sydle sincronizar recursosHumanos
 ```
 Opções:
 * `-v, --verbose`: Exibir logs detalhados.

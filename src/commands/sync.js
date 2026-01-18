@@ -7,8 +7,9 @@ const { ensureAuth } = require('../utils/authFlow');
 const config = require('../utils/config');
 const { createLogger } = require('../utils/logger');
 
-const syncCommand = new Command('sync')
-    .description('Sync local scripts to Sydle')
+const syncCommand = new Command('sincronizar')
+    .alias('sync')
+    .description('Sync script files to Sydle')
     .argument('[path]', 'Optional path: package.class.method, package.class, or package')
     .option('-v, --verbose', 'Show verbose logging')
     .action(async (syncPath, options) => {
@@ -111,101 +112,10 @@ const syncCommand = new Command('sync')
         }
     });
 
+const { syncMethodCore } = require('../core/syncLogic');
+
 async function syncMethod(methodJsonPath, classId, rootPath, logger) {
-    const relativePath = path.relative(rootPath, methodJsonPath);
-    const parts = relativePath.split(path.sep);
-
-    // Extract className and methodName
-    const methodName = parts[parts.length - 2];
-    const className = parts[parts.length - 3];
-
-    try {
-        logger.progress(`🔄 ${className}/${methodName}`);
-
-
-        // Read method.json
-        const methodData = JSON.parse(fs.readFileSync(methodJsonPath, 'utf-8'));
-
-        // Read all scripts
-        const methodFolder = path.dirname(methodJsonPath);
-        const scriptsFolder = path.join(methodFolder, 'scripts');
-
-        if (!fs.existsSync(scriptsFolder)) {
-            logger.warn(`   ⚠ No scripts folder found`);
-            return { success: false };
-        }
-
-        const scriptFiles = fs.readdirSync(scriptsFolder)
-            .filter(file => file.match(/^script_\d+\.js$/))
-            .sort((a, b) => {
-                const numA = parseInt(a.match(/script_(\d+)\.js/)[1], 10);
-                const numB = parseInt(b.match(/script_(\d+)\.js/)[1], 10);
-                return numA - numB;
-            });
-
-        if (scriptFiles.length === 0) {
-            logger.warn(`   ⚠ No script files found`);
-            return { success: false };
-        }
-
-        // Read all scripts
-        const scripts = [];
-        for (const scriptFile of scriptFiles) {
-            const scriptPath = path.join(scriptsFolder, scriptFile);
-            const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
-            scripts.push(scriptContent);
-        }
-
-        methodData.scripts = scripts;
-
-        // Write updated method.json
-        fs.writeFileSync(methodJsonPath, JSON.stringify(methodData, null, 4), 'utf-8');
-
-        // Get class _id
-        const classFolder = path.dirname(methodFolder);
-        const classJsonPath = path.join(classFolder, 'class.json');
-
-        if (!fs.existsSync(classJsonPath)) {
-            logger.error(`   ❌ class.json not found`);
-            return { success: false };
-        }
-
-        const classData = JSON.parse(fs.readFileSync(classJsonPath, 'utf-8'));
-        const classRecordId = classData._id;
-
-        // Get current class to find method index
-        const currentClass = await get(classId, classRecordId);
-        if (!currentClass || !currentClass.methods) {
-            logger.error(`   ❌ Failed to fetch class data`);
-            return { success: false };
-        }
-
-        const methodIndex = currentClass.methods.findIndex(m => m.identifier === methodName);
-        if (methodIndex === -1) {
-            logger.error(`   ❌ Method not found in class`);
-            return { success: false };
-        }
-
-        // Patch
-        const updateData = {
-            _id: classRecordId,
-            _operationsList: [{
-                op: 'replace',
-                path: `/methods/${methodIndex}`,
-                value: methodData
-            }]
-        };
-
-        await patch(classId, updateData);
-
-        logger.success(`   ✓ Synced (${scripts.length} script(s))`);
-        return { success: true };
-
-    } catch (error) {
-        logger.error(`   ❌ Failed: ${error.message}`);
-        logger.debug(error.stack);
-        return { success: false };
-    }
+    return await syncMethodCore(methodJsonPath, classId, rootPath, logger);
 }
 
 module.exports = syncCommand;

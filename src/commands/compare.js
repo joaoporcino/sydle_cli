@@ -6,8 +6,9 @@ const config = require('../utils/config');
 const inquirer = require('inquirer');
 const { performLogin } = require('../utils/authFlow');
 
-const compareCommand = new Command('compare')
-    .description('Compare method code between two environments (dev, hom, prod)')
+const compareCommand = new Command('comparar')
+    .alias('compare')
+    .description('Compare code between two environments (dev, hom, prod)')
     .argument('[classIdentifier]', 'Class identifier')
     .argument('[methodIdentifier]', 'Method identifier')
     .argument('[sourceEnv]', 'Source environment (dev, hom, prod)')

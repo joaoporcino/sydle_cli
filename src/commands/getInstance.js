@@ -7,6 +7,7 @@ const path = require('path');
 const { exec } = require('child_process');
 
 const obterInstanciaCommand = new Command('obterInstancia')
+    .alias('getInstance')
     .description('Fetch a class instance and view its content')
     .action(async () => {
         try {

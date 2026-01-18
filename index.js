@@ -4,12 +4,14 @@ const { program } = require("commander");
 const loginCommand = require('./src/commands/login');
 const initCommand = require('./src/commands/init');
 const mainCommand = require('./src/commands/main');
-const obterPacoteCommand = require('./src/commands/obterPacote');
-const obterClasseCommand = require('./src/commands/obterClasse');
+const obterPacoteCommand = require('./src/commands/getPackage');
+const obterClasseCommand = require('./src/commands/getClass');
 const compareCommand = require('./src/commands/compare');
 const watchCommand = require('./src/commands/watch');
 const syncCommand = require('./src/commands/sync');
-const obterInstanciaCommand = require('./src/commands/obterInstancia');
+const createMethodCommand = require('./src/commands/createMethod');
+const deleteMethodCommand = require('./src/commands/deleteMethod');
+const obterInstanciaCommand = require('./src/commands/getInstance');
 
 program
     .name("sydle")
@@ -23,6 +25,8 @@ program
     .addCommand(compareCommand)
     .addCommand(watchCommand)
     .addCommand(syncCommand)
+    .addCommand(createMethodCommand)
+    .addCommand(deleteMethodCommand)
     .addCommand(obterInstanciaCommand);
 
 program.parse();

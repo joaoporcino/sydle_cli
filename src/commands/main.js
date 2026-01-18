@@ -1,8 +1,9 @@
 const { Command } = require('commander');
 const { executeMainMethod } = require('../api/main');
 
-const mainCommand = new Command('main')
-    .description('Execute a method on a main entity')
+const mainCommand = new Command('executar')
+    .alias('main')
+    .description('Execute the main functionality')
     .argument('<id>', 'Entity ID')
     .argument('<method>', 'Method to execute (e.g., _get, _update)')
     .option('-d, --data <json>', 'JSON data payload', '{}')

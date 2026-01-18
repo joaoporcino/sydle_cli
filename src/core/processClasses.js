@@ -9,10 +9,13 @@ const path = require('path');
 const {
     generateClassDts,
     generateClassSchema,
+    generateFieldsSchema,
+    generateSydleZod,
     generateMethodFiles,
     generatePackageDts,
     generateGlobalsDts,
-    generateSydleDts
+    generateSydleDts,
+    generateAiDocs
 } = require('../generators');
 
 /**
@@ -131,6 +134,7 @@ async function processClasses(options) {
             // Generate class.d.ts and class.schema.js using generators
             await generateClassDts(_class, classPath, { classIdToIdentifier, classId });
             generateClassSchema(_class, classPath);
+            generateFieldsSchema(_class, classPath, rootPath);
 
             // Collect info for package.d.ts
             if (!packageInfoMap.has(packagePath)) {
@@ -154,10 +158,12 @@ async function processClasses(options) {
         console.log(`Generated package.d.ts in ${packagePath}`);
     }
 
-    // Phase 4: Generate globals.d.ts and sydle.d.ts
-    console.log('Phase 4: Generating globals.d.ts and sydle.d.ts...');
+    // Phase 4: Generate globals.d.ts, sydle.d.ts and sydleZod.js
+    console.log('Phase 4: Generating globals.d.ts, sydle.d.ts and sydleZod.js...');
     generateGlobalsDts(rootPath);
     generateSydleDts(process.cwd());
+    generateSydleZod(rootPath);
+    generateAiDocs(process.cwd());
 
     console.log(`Search completed. Total hits processed: ${totalHits}`);
     console.log('Operation complete.');

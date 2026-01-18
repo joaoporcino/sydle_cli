@@ -3,7 +3,8 @@ const { ensureAuth } = require('../utils/authFlow');
 const { processClasses } = require('../core/processClasses');
 
 const obterPacoteCommand = new Command('obterPacote')
-    .description('Fetch and generate files for a specific package identifier')
+    .alias('getPackage')
+    .description('Obter pacote do Sydle')
     .argument('<identifier>', 'Package identifier')
     .action(async (identifier) => {
         try {

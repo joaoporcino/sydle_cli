@@ -6,9 +6,12 @@ const path = require('path');
 const { get, update } = require('../api/main');
 const { ensureAuth } = require('../utils/authFlow');
 const { createLogger } = require('../utils/logger');
+const { scaffoldMethod } = require('../utils/scaffoldMethod');
+const { handleMethodDeletion } = require('../utils/deleteMethod');
 
-const watchCommand = new Command('watch')
-    .description('Watch for script changes and auto-sync to Sydle')
+const watchCommand = new Command('monitorar')
+    .alias('watch')
+    .description('Watch for changes in script files and sync to Sydle')
     .argument('[package]', 'Optional package to watch (e.g., recursosHumanos)')
     .option('-v, --verbose', 'Show verbose logging')
     .action(async (packageFilter, options) => {
@@ -69,10 +72,21 @@ const watchCommand = new Command('watch')
             const debounceTimers = new Map();
 
             // Watch the found files explicitly
-            const watcher = chokidar.watch(files, {
+            // Watch the glob pattern explicitly to support new files AND directories
+            const watcher = chokidar.watch([
+                globPattern, // scripts
+                rootPath // directories
+            ], {
                 cwd: rootPath,
                 persistent: true,
                 ignoreInitial: true,
+                ignored: [
+                    '**/node_modules/**',
+                    '**/.git/**',
+                    '**/dist/**',
+                    '**/artifacts/**',
+                    /(^|[\/\\])\../ // ignore dotfiles
+                ],
                 awaitWriteFinish: {
                     stabilityThreshold: 300,
                     pollInterval: 100
@@ -83,9 +97,16 @@ const watchCommand = new Command('watch')
                 logger.success(`\n💾 Watching ${files.length} files. Save any to sync automatically.\n`);
             });
 
-            watcher.on('change', async (relativePath) => {
+            const handleFileChange = async (relativePath) => {
                 // Construct absolute path (chokidar returns relative when using cwd)
                 const filePath = path.join(rootPath, relativePath);
+
+                // STRICT FILTER: Only process script_*.js files
+                // This prevents the watcher from trying to sync method.json, class.json, or other files
+                // which was causing errors like "No scripts folder found"
+                if (!filePath.endsWith('.js') || !filePath.includes(path.sep + 'scripts' + path.sep + 'script_')) {
+                    return;
+                }
 
                 // Debounce multiple rapid saves
                 if (debounceTimers.has(filePath)) {
@@ -98,6 +119,32 @@ const watchCommand = new Command('watch')
                 }, 500);
 
                 debounceTimers.set(filePath, timer);
+            };
+
+            watcher.on('change', handleFileChange);
+            watcher.on('add', handleFileChange);
+
+            // Handle directory creation for scaffolding
+            watcher.on('addDir', async (dirPath) => {
+                const absolutePath = path.join(rootPath, dirPath);
+                const relativePath = path.relative(rootPath, absolutePath);
+                const parts = relativePath.split(path.sep);
+
+                // Check depth: root/package/class/method -> depth 3 (0-indexed based on parts)
+                // sydle-dev (root) -> resourcesHumanos (0) -> ClassName (1) -> Method (2)
+                if (parts.length === 3) {
+                    const methodFolder = absolutePath;
+                    const methodName = parts[2];
+
+                    scaffoldMethod(methodFolder, rootPath, methodName, logger);
+                }
+            });
+
+            // Handle directory deletion
+            watcher.on('unlinkDir', async (dirPath) => {
+                const absolutePath = path.join(rootPath, dirPath);
+                // We pass the absolute path of the deleted folder to the handler
+                await handleMethodDeletion(absolutePath, rootPath, logger);
             });
 
             watcher.on('error', error => {
@@ -117,109 +164,35 @@ const watchCommand = new Command('watch')
         }
     });
 
+const { syncMethodCore } = require('../core/syncLogic');
+
 async function syncScript(filePath, classId, rootPath, logger) {
-
     try {
-        // Parse file path to extract metadata
-        const relativePath = path.relative(rootPath, filePath);
-        const parts = relativePath.split(path.sep);
-
-        // Expected: package/parts.../className/methodName/scripts/script_N.js
-        if (parts.length < 4 || parts[parts.length - 2] !== 'scripts') {
-            logger.warn(`⚠ Skipped (invalid path): ${relativePath}`);
-            return;
-        }
-
-        const scriptFileName = parts[parts.length - 1];
-        const methodName = parts[parts.length - 3];
-        const className = parts[parts.length - 4];
-
-        // Validate script filename
-        if (!scriptFileName.match(/^script_\d+\.js$/)) {
-            logger.warn(`⚠ Skipped (invalid filename): ${relativePath}`);
-            return;
-        }
-
-        logger.progress(`🔄 Syncing: ${className}/${methodName}/${scriptFileName}`);
-
-        // Get method folder and method.json path
+        // Parse current file to find associated method.json
+        // filePath is usually .../scripts/script_N.js
+        // We need method.json which is in ../method.json relative to scripts folder
         const methodFolder = path.dirname(path.dirname(filePath));
         const methodJsonPath = path.join(methodFolder, 'method.json');
-        const scriptsFolder = path.join(methodFolder, 'scripts');
 
         if (!fs.existsSync(methodJsonPath)) {
-            logger.error(`❌ Failed: method.json not found for ${className}/${methodName}`);
-            return;
+            logger.warn(`⚠ method.json not found, creating default for: ${path.basename(methodFolder)}`);
+            const defaultMethodData = {
+                identifier: path.basename(methodFolder),
+                name: path.basename(methodFolder),
+                accessLevel: 'PUBLIC',
+                engine: 'GRAAL',
+                inputParameters: [],
+                outputParameters: [],
+                scripts: []
+            };
+            fs.writeFileSync(methodJsonPath, JSON.stringify(defaultMethodData, null, 4));
         }
 
-        // Read method.json
-        const methodData = JSON.parse(fs.readFileSync(methodJsonPath, 'utf-8'));
-
-        // Read all script files from the scripts folder
-        const scriptFiles = fs.readdirSync(scriptsFolder)
-            .filter(file => file.match(/^script_\d+\.js$/))
-            .sort((a, b) => {
-                const numA = parseInt(a.match(/script_(\d+)\.js/)[1], 10);
-                const numB = parseInt(b.match(/script_(\d+)\.js/)[1], 10);
-                return numA - numB;
-            });
-
-        // Read all scripts and update method.json
-        const scripts = [];
-        for (const scriptFile of scriptFiles) {
-            const scriptPath = path.join(scriptsFolder, scriptFile);
-            const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
-            scripts.push(scriptContent);
-        }
-
-        methodData.scripts = scripts;
-
-        // Write updated method.json
-        fs.writeFileSync(methodJsonPath, JSON.stringify(methodData, null, 4), 'utf-8');
-
-        // Read class.json to get class _id and method index
-        const classFolder = path.dirname(methodFolder);
-        const classJsonPath = path.join(classFolder, 'class.json');
-
-        if (!fs.existsSync(classJsonPath)) {
-            logger.error(`❌ class.json not found: ${className}`);
-            return;
-        }
-
-        const classData = JSON.parse(fs.readFileSync(classJsonPath, 'utf-8'));
-        const classRecordId = classData._id;
-
-        // Get current class to find method index
-        const currentClass = await get(classId, classRecordId);
-        if (!currentClass || !currentClass.methods) {
-            logger.error(`❌ Failed: Class data not found`);
-            return;
-        }
-
-        const methodIndex = currentClass.methods.findIndex(m => m.identifier === methodName);
-        if (methodIndex === -1) {
-            logger.error(`❌ Failed: Method '${methodName}' not found in class '${className}'`);
-            return;
-        }
-
-        // Patch with full method object
-        const updateData = {
-            _id: classRecordId,
-            _operationsList: [{
-                op: 'replace',
-                path: `/methods/${methodIndex}`,
-                value: methodData
-            }]
-        };
-
-        const { patch } = require('../api/main');
-        await patch(classId, updateData);
-
-        logger.success(`✓ Synced: ${className}/${methodName} (${scripts.length} script(s))`);
+        // Delegate to core logic
+        await syncMethodCore(methodJsonPath, classId, rootPath, logger);
 
     } catch (error) {
         logger.error(`❌ Failed: ${error instanceof Error ? error.message : String(error)}`);
-        logger.debug(error instanceof Error ? error.stack : undefined);
     }
 }
 
