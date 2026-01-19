@@ -2,10 +2,11 @@ const { Command } = require('commander');
 const { glob } = require('glob');
 const fs = require('fs');
 const path = require('path');
-const { get, patch } = require('../api/main');
 const { ensureAuth } = require('../utils/authFlow');
 const config = require('../utils/config');
 const { createLogger } = require('../utils/logger');
+const { syncMethodCore, ensureClassExists } = require('../core/syncLogic');
+const { syncFieldsCore } = require('../core/syncFields');
 
 const syncCommand = new Command('sincronizar')
     .alias('sync')
@@ -52,19 +53,66 @@ const syncCommand = new Command('sincronizar')
 
             // Build glob pattern based on path
             let pattern = '**/method.json';
+            let classPattern = '**/class.json';
+            let fieldsPattern = '**/fields.js';
             if (syncPath) {
                 const parts = syncPath.split('.');
                 if (parts.length === 3) {
                     // Specific method: package.class.method
                     const [pkg, cls, method] = parts;
                     pattern = `${pkg.split('.').join('/')}/${cls}/${method}/method.json`;
+                    classPattern = `${pkg.split('.').join('/')}/${cls}/class.json`;
+                    fieldsPattern = `${pkg.split('.').join('/')}/${cls}/fields.js`;
                 } else if (parts.length === 2) {
                     // Specific class: package.class
                     const [pkg, cls] = parts;
                     pattern = `${pkg.split('.').join('/')}/${cls}/*/method.json`;
+                    classPattern = `${pkg.split('.').join('/')}/${cls}/class.json`;
+                    fieldsPattern = `${pkg.split('.').join('/')}/${cls}/fields.js`;
                 } else if (parts.length === 1) {
                     // Specific package
                     pattern = `${parts[0].split('.').join('/')}/**/method.json`;
+                    classPattern = `${parts[0].split('.').join('/')}/**/class.json`;
+                    fieldsPattern = `${parts[0].split('.').join('/')}/**/fields.js`;
+                }
+            }
+
+            // First, ensure all classes exist in Sydle
+            const classFiles = await glob(classPattern, {
+                cwd: rootPath,
+                absolute: false,
+                nodir: true
+            });
+
+            let classesCreated = 0;
+            for (const classFile of classFiles) {
+                const classJsonPath = path.join(rootPath, classFile);
+                const result = await ensureClassExists(classJsonPath, logger);
+                if (result.created) {
+                    classesCreated++;
+                }
+            }
+
+            if (classesCreated > 0) {
+                logger.info(`\n📦 Created ${classesCreated} class(es) in Sydle\n`);
+            }
+
+            // Sync fields.js files
+            const fieldsFiles = await glob(fieldsPattern, {
+                cwd: rootPath,
+                absolute: false,
+                nodir: true
+            });
+
+            let fieldsSynced = 0;
+            let fieldsSkipped = 0;
+            for (const fieldsFile of fieldsFiles) {
+                const fieldsJsPath = path.join(rootPath, fieldsFile);
+                const result = await syncFieldsCore(fieldsJsPath, classId, rootPath, logger);
+                if (result.success) {
+                    fieldsSynced++;
+                } else if (result.message === 'No fields defined') {
+                    fieldsSkipped++;
                 }
             }
 
@@ -84,23 +132,41 @@ const syncCommand = new Command('sincronizar')
 
             let successCount = 0;
             let failCount = 0;
+            let skippedCount = 0;
 
             // Sync each method
             for (const methodFile of methodFiles) {
-                const result = await syncMethod(path.join(rootPath, methodFile), classId, rootPath, logger);
+                const result = await syncMethodCore(path.join(rootPath, methodFile), classId, rootPath, logger);
                 if (result.success) {
-                    successCount++;
+                    if (result.skipped) {
+                        skippedCount++;
+                    } else {
+                        successCount++;
+                    }
                 } else {
                     failCount++;
                 }
             }
 
             // Summary
-            const summaryLines = [
-                `✓ Successfully synced: ${successCount} method(s)`
-            ];
+            const summaryLines = [];
+            if (classesCreated > 0) {
+                summaryLines.push(`✓ Created classes: ${classesCreated}`);
+            }
+            if (fieldsSynced > 0) {
+                summaryLines.push(`✓ Synced fields: ${fieldsSynced}`);
+            }
+            if (successCount > 0) {
+                summaryLines.push(`✓ Synced methods: ${successCount}`);
+            }
+            if (skippedCount > 0) {
+                summaryLines.push(`⏭ Skipped (no scripts): ${skippedCount}`);
+            }
             if (failCount > 0) {
-                summaryLines.push(`✗ Failed: ${failCount} method(s)`);
+                summaryLines.push(`✗ Failed: ${failCount}`);
+            }
+            if (summaryLines.length === 0) {
+                summaryLines.push('No changes made');
             }
             logger.summary(summaryLines);
 
@@ -112,10 +178,5 @@ const syncCommand = new Command('sincronizar')
         }
     });
 
-const { syncMethodCore } = require('../core/syncLogic');
-
-async function syncMethod(methodJsonPath, classId, rootPath, logger) {
-    return await syncMethodCore(methodJsonPath, classId, rootPath, logger);
-}
-
 module.exports = syncCommand;
+

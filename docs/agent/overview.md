@@ -1,6 +1,6 @@
 # Sydle CLI - AI Agent Overview
 
-This CLI allows you to manage Sydle system entities (Classes, Methods) directly from the file system.
+This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) directly from the file system.
 
 ## Key Concepts
 - **Root Folder**: `sydle-env` (e.g., `sydle-dev`). Use `process.cwd()` or find this folder to locate source code.
@@ -8,8 +8,13 @@ This CLI allows you to manage Sydle system entities (Classes, Methods) directly 
 - **Authentication**: Handled automatically via `authFlow.js`. If a command fails with 401, suggest `sydle login`.
 
 ## Core Commands for Agents
-- `sydle monitorar <package>`: (Alias: `watch`) Monitors changes. The most powerful command. 
-- `sydle sincronizar <package>`: (Alias: `sync`) Manual synchronization.
-- `sydle criarMetodo`: Scaffolds a new method (interactive or with args).
-- `sydle excluirMetodo`: Deletes a method folder and removes it from Sydle.
+- `sydle criarClasse`: (Alias: `createClass`) Creates a new class **locally**. Use `sync` to publish to Sydle.
+- `sydle sincronizar <path>`: (Alias: `sync`) Syncs classes, fields, and methods to Sydle. **Creates new classes automatically**.
+- `sydle monitorar <package>`: (Alias: `watch`) Monitors changes and syncs automatically.
+- `sydle criarMetodo`: (Alias: `createMethod`) Scaffolds a new method.
+- `sydle excluirMetodo`: (Alias: `deleteMethod`) Deletes a method folder and removes it from Sydle.
 - `sydle obterClasse <id>`: (Alias: `getClass`) Fetches a class definition.
+
+## Class Creation Workflow
+1. `sydle createClass <package> <name>` - Creates class locally with `_revision: "0"`
+2. `sydle sync <package>.<class>` - Publishes class to Sydle, updates local `_id`

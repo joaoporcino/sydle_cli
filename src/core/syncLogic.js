@@ -1,6 +1,66 @@
 const fs = require('fs');
 const path = require('path');
-const { get, patch } = require('../api/main');
+const { get, patch, create } = require('../api/main');
+
+const CLASS_METADATA_ID = '000000000000000000000000';
+
+/**
+ * Ensures a class exists in Sydle, creating it if needed
+ * @param {string} classJsonPath - Absolute path to class.json
+ * @param {Object} logger - Logger instance
+ * @returns {Promise<{success: boolean, classData: Object|null, created: boolean}>}
+ */
+async function ensureClassExists(classJsonPath, logger) {
+    if (!fs.existsSync(classJsonPath)) {
+        return { success: false, classData: null, created: false };
+    }
+
+    const classData = JSON.parse(fs.readFileSync(classJsonPath, 'utf-8'));
+    const className = classData.identifier || classData.name;
+
+    // Check if this is an unpublished draft (_revision: "0" indicates not yet created in Sydle)
+    const isUnpublishedDraft = classData._revision === "0" || classData._revision === 0;
+
+    if (isUnpublishedDraft) {
+        logger.progress(`📤 Publishing class '${className}' to Sydle...`);
+
+        // Clean up draft-specific fields before creating
+        const createData = { ...classData };
+        delete createData._revision;
+        delete createData._lastUpdateDate;
+        delete createData._lastUpdateUser;
+        delete createData._creationDate;
+        delete createData._creationUser;
+        delete createData._classRevision;
+        delete createData._id; // Let Sydle assign the ID
+
+        try {
+            // Create class in Sydle
+            const createdClass = await create(CLASS_METADATA_ID, createData);
+
+            // Update local class.json with new _id and _revision from Sydle
+            classData._id = createdClass._id;
+            classData._revision = createdClass._revision;
+            fs.writeFileSync(classJsonPath, JSON.stringify(classData, null, 4), 'utf-8');
+
+            logger.success(`✓ Class published in Sydle (ID: ${createdClass._id})`);
+            return { success: true, classData: createdClass, created: true };
+        } catch (createError) {
+            logger.error(`❌ Failed to publish class: ${createError.message}`);
+            return { success: false, classData: null, created: false };
+        }
+    }
+
+    // Class already exists (has _revision > 0), fetch it to verify
+    try {
+        const currentClass = await get(CLASS_METADATA_ID, classData._id);
+        return { success: true, classData: currentClass, created: false };
+    } catch (error) {
+        // This shouldn't happen for published classes, but handle edge case
+        logger.error(`❌ Failed to fetch class '${className}': ${error.message}`);
+        return { success: false, classData: null, created: false };
+    }
+}
 
 /**
  * Core logic to sync a method to Sydle
@@ -8,7 +68,7 @@ const { get, patch } = require('../api/main');
  * @param {string} classId - Class Id
  * @param {string} rootPath - Absolute path to the root environment folder (e.g. sydle-dev)
  * @param {Object} logger - Logger instance
- * @returns {Promise<{success: boolean, message?: string}>}
+ * @returns {Promise<{success: boolean, skipped?: boolean, message?: string}>}
  */
 async function syncMethodCore(methodJsonPath, classId, rootPath, logger) {
     const relativePath = path.relative(rootPath, methodJsonPath);
@@ -17,6 +77,9 @@ async function syncMethodCore(methodJsonPath, classId, rootPath, logger) {
     // Extract className and methodName
     const methodName = parts[parts.length - 2];
     const className = parts[parts.length - 3];
+
+    // Skip system methods that have no custom scripts
+    const isSystemMethod = methodName.startsWith('_');
 
     try {
         logger.progress(`🔄 ${className}/${methodName}`);
@@ -29,6 +92,10 @@ async function syncMethodCore(methodJsonPath, classId, rootPath, logger) {
         const scriptsFolder = path.join(methodFolder, 'scripts');
 
         if (!fs.existsSync(scriptsFolder)) {
+            if (isSystemMethod) {
+                logger.log(`   ⏭ Skipped (system method, no scripts)`);
+                return { success: true, skipped: true };
+            }
             logger.warn(`   ⚠ No scripts folder found`);
             return { success: false };
         }
@@ -42,6 +109,10 @@ async function syncMethodCore(methodJsonPath, classId, rootPath, logger) {
             });
 
         if (scriptFiles.length === 0) {
+            if (isSystemMethod) {
+                logger.log(`   ⏭ Skipped (system method, no scripts)`);
+                return { success: true, skipped: true };
+            }
             logger.warn(`   ⚠ No script files found`);
             return { success: false };
         }
@@ -118,4 +189,4 @@ async function syncMethodCore(methodJsonPath, classId, rootPath, logger) {
     }
 }
 
-module.exports = { syncMethodCore };
+module.exports = { syncMethodCore, ensureClassExists };
