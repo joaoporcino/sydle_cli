@@ -1,62 +1,36 @@
+/**
+ * @fileoverview Get Package Command
+ * 
+ * CLI command to fetch all classes from a Sydle package.
+ * Portuguese: sydle obterPacote
+ * English alias: sydle getPackage
+ * 
+ * @module commands/getPackage
+ */
+
 const { Command } = require('commander');
 const { ensureAuth } = require('../utils/authFlow');
-const { searchPaginated, get } = require('../api/main');
-const { processClasses } = require('../core/processClasses');
-
-const CLASS_METADATA_ID = '000000000000000000000000';
+const { runGetPackageFlow } = require('../utils/packageFlow');
 
 const obterPacoteCommand = new Command('obterPacote')
     .alias('getPackage')
-    .description('Obter pacote do Sydle')
-    .argument('<identifier>', 'Package identifier')
-    .action(async (identifier) => {
+    .alias('gp')
+    .description('Obter todas as classes de um pacote (Get all classes from a package)')
+    .argument('[identifier]', 'Identificador do pacote (Package identifier)')
+    .option('-v, --verbose', 'Mostrar logs detalhados')
+    .action(async (identifier, options) => {
         try {
+            // 1. Authentication Check
             if (!(await ensureAuth())) {
                 return;
             }
 
-            console.log(`Fetching classes from package ${identifier}...`);
-
-            // Query filtering by package identifier
-            const query = {
-                query: {
-                    term: { "package.identifier.keyword": identifier }
-                },
-                sort: [{ "_id": "asc" }]
-            };
-
-            // Fetch classes from API
-            const classesData = [];
-            await searchPaginated(CLASS_METADATA_ID, query, 50, async (hits) => {
-                console.log(`Found ${hits.length} classes in this batch...`);
-                for (const hit of hits) {
-                    if (hit._source) {
-                        // Fetch full class to ensure we have all details including scripts
-                        try {
-                            const fullClass = await get(CLASS_METADATA_ID, hit._source._id);
-                            classesData.push(fullClass);
-                        } catch (error) {
-                            console.error(`Failed to fetch class ${hit._source._id}, using search result.`);
-                            classesData.push(hit._source);
-                        }
-                    }
-                }
-            });
-
-            if (classesData.length === 0) {
-                console.error(`No classes found in package '${identifier}'`);
-                return;
-            }
-
-            console.log(`Total classes fetched: ${classesData.length}`);
-
-            // Process all classes
-            await processClasses(classesData, {
-                description: `Processing package ${identifier}...`
-            });
+            // 2. Run Package Flow
+            await runGetPackageFlow(identifier, options);
 
         } catch (error) {
-            console.error('Error:', error instanceof Error ? error.message : String(error));
+            console.error('❌ Erro:', error instanceof Error ? error.message : String(error));
+            if (options.verbose && error instanceof Error) console.debug(error.stack);
             process.exit(1);
         }
     });
