@@ -10,6 +10,7 @@
 
 const { Command } = require('commander');
 const path = require('path');
+const { createLogger } = require('../utils/logger');
 const {
     promptCompareArgs,
     getCurrentUrl,
@@ -27,7 +28,9 @@ const compareCommand = new Command('comparar')
     .argument('[methodIdentifier]', 'Method identifier')
     .argument('[sourceEnv]', 'Source environment (dev, hom, prod)')
     .argument('[targetEnv]', 'Target environment (dev, hom, prod)')
-    .action(async (classIdentifierArg, methodIdentifierArg, sourceEnvArg, targetEnvArg) => {
+    .option('-v, --verbose', 'Mostrar logs detalhados')
+    .action(async (classIdentifierArg, methodIdentifierArg, sourceEnvArg, targetEnvArg, options) => {
+        const logger = createLogger(options.verbose);
         try {
             // 1. Interactive flow for missing arguments
             const args = await promptCompareArgs({
@@ -47,14 +50,14 @@ const compareCommand = new Command('comparar')
             const sourceUrl = resolveUrl(sourceEnv);
             const targetUrl = resolveUrl(targetEnv);
 
-            console.log(`Source URL (${sourceEnv}): ${sourceUrl}`);
-            console.log(`Target URL (${targetEnv}): ${targetUrl}`);
+            logger.info(`Source URL (${sourceEnv}): ${sourceUrl}`);
+            logger.info(`Target URL (${targetEnv}): ${targetUrl}`);
 
             const sourceToken = getTokenForUrl(sourceUrl);
             const targetToken = getTokenForUrl(targetUrl);
 
-            if (!sourceToken) console.warn(`Warning: No token found for source URL ${sourceUrl}`);
-            if (!targetToken) console.warn(`Warning: No token found for target URL ${targetUrl}`);
+            if (!sourceToken) logger.warn(`Warning: No token found for source URL ${sourceUrl}`);
+            if (!targetToken) logger.warn(`Warning: No token found for target URL ${targetUrl}`);
 
             // 4. Fetch method data from both environments
             const [sourceData, targetData] = await Promise.all([
@@ -89,11 +92,12 @@ const compareCommand = new Command('comparar')
                 targetUrl
             });
 
-            console.log('Open the conflict file(s) to view and merge changes manually if preferred.');
+            logger.success('Open the conflict file(s) to view and merge changes manually if preferred.');
 
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error('Compare command failed:', message);
+            logger.error(`Compare command failed: ${message}`);
+            if (options.verbose && error instanceof Error) logger.debug(error.stack);
         }
     });
 

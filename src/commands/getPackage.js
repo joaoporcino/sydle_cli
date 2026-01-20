@@ -11,6 +11,7 @@
 const { Command } = require('commander');
 const { ensureAuth } = require('../utils/authFlow');
 const { runGetPackageFlow } = require('../utils/packageFlow');
+const { createLogger } = require('../utils/logger');
 
 const obterPacoteCommand = new Command('obterPacote')
     .alias('getPackage')
@@ -19,6 +20,7 @@ const obterPacoteCommand = new Command('obterPacote')
     .argument('[identifier]', 'Identificador do pacote (Package identifier)')
     .option('-v, --verbose', 'Mostrar logs detalhados')
     .action(async (identifier, options) => {
+        const logger = createLogger(options.verbose);
         try {
             // 1. Authentication Check
             if (!(await ensureAuth())) {
@@ -29,8 +31,8 @@ const obterPacoteCommand = new Command('obterPacote')
             await runGetPackageFlow(identifier, options);
 
         } catch (error) {
-            console.error('❌ Erro:', error instanceof Error ? error.message : String(error));
-            if (options.verbose && error instanceof Error) console.debug(error.stack);
+            logger.error(`❌ Erro: ${error instanceof Error ? error.message : String(error)}`);
+            if (options.verbose && error instanceof Error) logger.debug(error.stack);
             process.exit(1);
         }
     });

@@ -1,4 +1,5 @@
 const { client } = require('./client');
+const { logger } = require('../utils/logger');
 
 /**
  * Executes a specific method on a Sydle class.
@@ -28,10 +29,10 @@ const executeMainMethod = async (id, method, data = {}, httpMethod = 'POST') => 
         const response = await client(config);
         return response.data;
     } catch (error) {
-        console.error(`Error executing ${method} on ${id}:`, error.message);
+        logger.error(`Error executing ${method} on ${id}: ${error.message}`);
         if (error.response) {
-            console.error('Response status:', error.response.status);
-            console.error('Response data:', error.response.data);
+            logger.debug(`Response status: ${error.response.status}`);
+            logger.debug(`Response data: ${JSON.stringify(error.response.data)}`);
         }
         throw error;
     }

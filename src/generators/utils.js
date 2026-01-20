@@ -4,6 +4,7 @@
  */
 
 const path = require('path');
+const { logger } = require('../utils/logger');
 
 /**
  * Map Sydle field type to TypeScript type
@@ -21,7 +22,7 @@ function mapToTsType(field, classIdToIdentifier) {
         if (refClassName) {
             type = `I_Data_${refClassName}`;
         } else {
-            console.warn(`Warning: Referenced class ${field.refClass._id} not found for field ${field.identifier}`);
+            logger.warn(`Warning: Referenced class ${field.refClass._id} not found for field ${field.identifier}`);
             type = 'string';
         }
     }

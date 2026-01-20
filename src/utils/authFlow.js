@@ -2,6 +2,7 @@ const inquirer = require('inquirer');
 const { signIn } = require('../api/auth');
 const config = require('./config');
 const { setEnvValue } = require('./env');
+const { logger } = require('./logger');
 
 const performLogin = async (username, password, url) => {
     // Save URL to .env if provided
@@ -17,10 +18,10 @@ const performLogin = async (username, password, url) => {
         setEnvValue(envKey, url);
         process.env[envKey] = url;
 
-        console.log(`Configuration saved to .env (SYDLE_API_URL and ${envKey})`);
+        logger.info(`Configuration saved to .env (SYDLE_API_URL and ${envKey})`);
     }
 
-    console.log('Logging in...');
+    logger.progress('Logging in...');
     const data = await signIn(username, password);
 
     if (data.accessToken && data.accessToken.token) {
@@ -34,10 +35,10 @@ const performLogin = async (username, password, url) => {
             config.set('envTokens', envTokens);
         }
 
-        console.log('Login successful! Token saved.');
+        logger.success('Login successful! Token saved.');
         return true;
     } else {
-        console.error('Login failed: No token received.');
+        logger.error('Login failed: No token received.');
         return false;
     }
 };
@@ -67,7 +68,7 @@ const ensureAuth = async (force = false) => {
         const envVarName = `SYDLE_URL_${environment.toUpperCase()}`;
         if (process.env[envVarName]) {
             selectedUrl = process.env[envVarName];
-            console.log(`Using stored URL for ${environment}: ${selectedUrl}`);
+            logger.info(`Using stored URL for ${environment}: ${selectedUrl}`);
         }
     }
 

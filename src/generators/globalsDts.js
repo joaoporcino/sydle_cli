@@ -6,6 +6,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { logger } = require('../utils/logger');
+
 /**
  * Generate globals.d.ts with references to elasticsearch, packages, and classes
  * @param {string} rootPath - Root directory path (sydle-dev)
@@ -54,7 +56,7 @@ function generateGlobalsDts(rootPath) {
     globalsDtsContent += `
 `;
     fs.writeFileSync(globalsDtsPath, globalsDtsContent);
-    console.log(`Generated globals.d.ts in ${rootPath}`);
+    logger.debug(`Generated globals.d.ts in ${rootPath}`);
 }
 
 module.exports = {

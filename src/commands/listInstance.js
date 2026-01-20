@@ -92,7 +92,7 @@ const listInstanceCommand = new Command('listarInstancia')
                         displayValues.push(`${field}: ${value.substring(0, 50)}`);
                     }
                 }
-                console.log(`   • ${displayValues.join(' | ')}`);
+                logger.log(`   • ${displayValues.join(' | ')}`);
             }
 
             logger.info(`\n   Use 'sydle obterInstancia ${packageClass} <_id>' para baixar uma instância.`);

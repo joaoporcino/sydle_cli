@@ -1,5 +1,6 @@
 const { Command } = require('commander');
 const { executeMainMethod } = require('../api/main');
+const { createLogger } = require('../utils/logger');
 
 const mainCommand = new Command('executar')
     .alias('main')
@@ -8,13 +9,15 @@ const mainCommand = new Command('executar')
     .argument('<method>', 'Method to execute (e.g., _get, _update)')
     .option('-d, --data <json>', 'JSON data payload', '{}')
     .option('-m, --http-method <httpMethod>', 'HTTP Method (GET, POST, etc.)', 'POST')
+    .option('-v, --verbose', 'Mostrar logs detalhados')
     .action(async (id, method, options) => {
+        const logger = createLogger(options.verbose);
         try {
             let data = {};
             try {
                 data = JSON.parse(options.data);
             } catch (e) {
-                console.error('Invalid JSON data provided.');
+                logger.error('Invalid JSON data provided.');
                 return;
             }
 
@@ -24,11 +27,12 @@ const mainCommand = new Command('executar')
                 httpMethod = 'GET';
             }
 
-            console.log(`Executing ${method} on ${id}...`);
+            logger.progress(`Executing ${method} on ${id}...`);
             const result = await executeMainMethod(id, method, data, httpMethod);
-            console.log(JSON.stringify(result, null, 2));
+            logger.log(JSON.stringify(result, null, 2));
         } catch (error) {
-            console.error('Operation failed.');
+            logger.error(`Operation failed: ${error instanceof Error ? error.message : String(error)}`);
+            if (options.verbose && error instanceof Error) logger.debug(error.stack);
         }
     });
 
