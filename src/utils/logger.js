@@ -85,4 +85,7 @@ function createLogger(verbose = false) {
     return new Logger(verbose);
 }
 
-module.exports = { Logger, createLogger };
+// Default instance
+const logger = createLogger(process.argv.includes('--verbose') || process.argv.includes('-v'));
+
+module.exports = { Logger, createLogger, logger };

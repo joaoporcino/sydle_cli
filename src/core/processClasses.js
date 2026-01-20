@@ -19,6 +19,7 @@ const {
     generateSydleDts,
     generateAiDocs
 } = require('../generators');
+const { logger } = require('../utils/logger');
 
 /**
  * Process an array of classes and generate all necessary files
@@ -30,7 +31,7 @@ const {
 async function processClasses(classesData, options = {}) {
     const { description } = options;
 
-    console.log(description || 'Processing classes...');
+    logger.info(description || 'Processing classes...');
 
     const classId = '000000000000000000000000';
     const classPakageId = '000000000000000000000015';
@@ -52,7 +53,7 @@ async function processClasses(classesData, options = {}) {
     // Phase 0: Load existing classes from previously downloaded packages
     const classIdToIdentifier = new Map();
 
-    console.log('Phase 0: Loading existing classes from other packages...');
+    logger.info('Phase 0: Loading existing classes from other packages...');
     if (fs.existsSync(rootPath)) {
         const loadClassesRecursively = (dir) => {
             const items = fs.readdirSync(dir);
@@ -76,7 +77,7 @@ async function processClasses(classesData, options = {}) {
         };
 
         loadClassesRecursively(rootPath);
-        console.log(`Loaded ${classIdToIdentifier.size} existing classes from other packages.`);
+        logger.debug(`Loaded ${classIdToIdentifier.size} existing classes from other packages.`);
     }
 
     // Add new classes to the map
@@ -86,9 +87,9 @@ async function processClasses(classesData, options = {}) {
         }
     }
 
-    console.log(`Phase 1: Processing ${classesData.length} classes...`);
+    logger.info(`Phase 1: Processing ${classesData.length} classes...`);
     for (const _class of classesData) {
-        console.log(`Generating files for class: ${_class.identifier}`);
+        logger.progress(`Generating files for class: ${_class.identifier}`);
 
         try {
             // Get package info
@@ -96,7 +97,7 @@ async function processClasses(classesData, options = {}) {
             try {
                 _pakage = await get(classPakageId, _class.package._id);
             } catch (error) {
-                console.error(`Failed to fetch package for class ${_class.identifier}`);
+                logger.error(`Failed to fetch package for class ${_class.identifier}`);
                 continue;
             }
 
@@ -133,26 +134,26 @@ async function processClasses(classesData, options = {}) {
                 identifier: _class.identifier
             });
         } catch (error) {
-            console.error(`Error processing class ${_class.identifier}:`, error instanceof Error ? error.message : String(error));
+            logger.error(`Error processing class ${_class.identifier}: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
     // Phase 2: Generate package.d.ts for each package
-    console.log('Phase 2: Generating package.d.ts files...');
+    logger.info('Phase 2: Generating package.d.ts files...');
     for (const [packagePath, packageInfo] of packageInfoMap.entries()) {
         generatePackageDts(packageInfo, packagePath);
-        console.log(`Generated package.d.ts in ${packagePath}`);
+        logger.debug(`Generated package.d.ts in ${packagePath}`);
     }
 
     // Phase 3: Generate globals.d.ts, sydle.d.ts and sydleZod.js
-    console.log('Phase 3: Generating globals.d.ts, sydle.d.ts and sydleZod.js...');
+    logger.info('Phase 3: Generating globals.d.ts, sydle.d.ts and sydleZod.js...');
     generateGlobalsDts(rootPath);
     generateSydleDts(process.cwd());
     generateSydleZod(rootPath);
     generateAiDocs(process.cwd());
 
-    console.log(`Processing completed. Total classes processed: ${classesData.length}`);
-    console.log('Operation complete.');
+    logger.success(`Processing completed. Total classes processed: ${classesData.length}`);
+    logger.success('Operation complete.');
 
     return {
         packagesGenerated: packageInfoMap.size,

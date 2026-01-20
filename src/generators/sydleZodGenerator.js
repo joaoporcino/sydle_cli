@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('../utils/logger');
 
 /**
  * Generate sydleZod.js in the typings folder
@@ -25,9 +26,9 @@ function generateSydleZod(rootPath) {
     if (fs.existsSync(sourcePath)) {
         const content = fs.readFileSync(sourcePath, 'utf8');
         fs.writeFileSync(targetPath, content);
-        console.log(`Generated sydleZod.js in ${typingsPath}`);
+        logger.debug(`Generated sydleZod.js in ${typingsPath}`);
     } else {
-        console.warn(`Warning: sydleZod.js source not found at ${sourcePath}`);
+        logger.warn(`Warning: sydleZod.js source not found at ${sourcePath}`);
     }
 }
 

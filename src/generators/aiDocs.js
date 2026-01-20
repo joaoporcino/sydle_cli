@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('../utils/logger');
 
 function generateAiDocs(rootPath) {
   const docsDir = path.join(rootPath, 'docs', 'agent');
@@ -388,7 +389,7 @@ sydle data get <pkg>.<class> <id>             # Edit data instance locally
 `;
   fs.writeFileSync(path.join(docsDir, 'context.md'), context);
 
-  console.log('Generated AI Docs at ' + docsDir);
+  logger.debug('Generated AI Docs at ' + docsDir);
 }
 
 module.exports = { generateAiDocs };

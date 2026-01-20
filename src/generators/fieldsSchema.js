@@ -25,6 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('../utils/logger');
 
 /**
  * Maps a Sydle field definition to an `sy` builder chain string.
@@ -180,7 +181,7 @@ function generateFieldsSchema(classData, outputPath, rootPath) {
     const fields = (classData.fields || []).filter(f => !f.identifier.startsWith('_'));
 
     if (fields.length === 0) {
-        console.log(`Skipping fields.js for ${classData.identifier} - no custom fields`);
+        logger.debug(`Skipping fields.js for ${classData.identifier} - no custom fields`);
         return;
     }
 
@@ -214,7 +215,7 @@ module.exports = {
 
     const fieldsPath = path.join(outputPath, 'fields.js');
     fs.writeFileSync(fieldsPath, content);
-    console.log(`Generated fields.js for ${classData.identifier}`);
+    logger.debug(`Generated fields.js for ${classData.identifier}`);
 }
 
 module.exports = {

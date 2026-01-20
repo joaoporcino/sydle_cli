@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('../utils/logger');
 
 /**
  * Generate sydle.d.ts with global Sydle definitions
@@ -99,7 +100,7 @@ declare interface I_PatchOperation<FieldPaths = string> {
 `;
 
     fs.writeFileSync(path.join(typingsPath, 'sydle.d.ts'), content);
-    console.log('Generated typings/sydle.d.ts');
+    logger.debug('Generated typings/sydle.d.ts');
 }
 
 module.exports = { generateSydleDts };

@@ -1,4 +1,5 @@
 const { get } = require('../api/main');
+const { logger } = require('../utils/logger');
 
 // Helper: Map field to TypeScript type
 function mapToTsType(field, classIdToIdentifier) {
@@ -11,7 +12,7 @@ function mapToTsType(field, classIdToIdentifier) {
         if (refClassName) {
             type = `I_Data_${refClassName}`;
         } else {
-            console.warn(`Warning: Referenced class ${field.refClass._id} not found for field ${field.identifier}`);
+            logger.warn(`Warning: Referenced class ${field.refClass._id} not found for field ${field.identifier}`);
             type = 'string';
         }
     }
@@ -86,7 +87,7 @@ async function generateClassDts(classData, outputPath, options) {
                 });
             }
         } catch (error) {
-            console.error(`Failed to load embedded class for field ${embField.identifier}:`, error.message);
+            logger.error(`Failed to load embedded class for field ${embField.identifier}: ${error.message}`);
         }
     }
 
