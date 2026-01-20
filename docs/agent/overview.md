@@ -14,6 +14,7 @@ This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) d
 - `sydle criarMetodo`: (Alias: `createMethod`) Scaffolds a new method.
 - `sydle excluirMetodo`: (Alias: `deleteMethod`) Deletes a method folder and removes it from Sydle.
 - `sydle obterClasse <id>`: (Alias: `getClass`) Fetches a class definition.
+- `sydle dados`: (Alias: `data`) Manage class instances (get, update, search).
 
 ## Class Creation Workflow
 1. `sydle createClass <package> <name>` - Creates class locally with `_revision: "0"`

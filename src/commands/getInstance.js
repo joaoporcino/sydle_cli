@@ -1,7 +1,7 @@
 /**
  * @fileoverview Get Instance Command
  * 
- * CLI command to fetch a class instance and view its content.
+ * CLI command to fetch a class instance and save it locally for editing.
  * Portuguese: sydle obterInstancia
  * English alias: sydle getInstance
  * 
@@ -10,67 +10,97 @@
 
 const { Command } = require('commander');
 const { ensureAuth } = require('../utils/authFlow');
+const { createLogger } = require('../utils/logger');
+const { get } = require('../api/main');
 const {
-    promptClassIdentifier,
-    resolveClassIdentifier,
-    promptSearchMethod,
+    parsePackageClass,
+    validatePackageAndClass,
     promptInstanceId,
-    promptFieldSearch,
-    fetchInstanceById,
-    fetchInstanceByField,
-    saveInstanceJson,
-    extractHtmlFields,
-    openFileInEditor
-} = require('../utils/getInstanceFlow');
+    saveInstanceToLocal
+} = require('../utils/instanceDataFlow');
+const path = require('path');
 
 const obterInstanciaCommand = new Command('obterInstancia')
     .alias('getInstance')
-    .description('Fetch a class instance and view its content')
-    .action(async () => {
+    .description('Baixa uma instância do Sydle para edição local (Get instance for local editing)')
+    .argument('<package.class>', 'Pacote e classe (ex: recursosHumanos.templatesDemissao)')
+    .argument('[id]', 'ID da instância (_id)')
+    .option('-v, --verbose', 'Mostrar logs detalhados')
+    .action(async (packageClass, idArg, options) => {
+        const logger = createLogger(options.verbose);
+
         try {
+            // 1. Authentication Check
             if (!(await ensureAuth())) {
                 return;
             }
 
-            // 1. Ask for Class Identifier
-            const classIdentifier = await promptClassIdentifier();
-
-            // 2. Resolve Class Identifier to Class Definition
-            const classResult = await resolveClassIdentifier(classIdentifier);
-            if (!classResult) return;
-
-            const { classDefinition, targetClassId } = classResult;
-
-            // 3. Ask for Search Method
-            const searchMethod = await promptSearchMethod();
-
-            let instanceData = null;
-
-            if (searchMethod === 'id') {
-                const idValue = await promptInstanceId();
-                instanceData = await fetchInstanceById(targetClassId, idValue);
-            } else {
-                const { fieldName, fieldValue } = await promptFieldSearch();
-                instanceData = await fetchInstanceByField(targetClassId, fieldName, fieldValue);
+            // 2. Parse package.class
+            const parsed = parsePackageClass(packageClass);
+            if (!parsed) {
+                logger.error('❌ Formato inválido. Use: package.class (ex: recursosHumanos.templatesDemissao)');
+                return;
             }
 
-            if (!instanceData) return;
+            const { packageId, classId } = parsed;
+            logger.info(`\n📦 Buscando instância de ${packageId}.${classId}...`);
 
-            // 4. Save JSON and Open
-            const filePath = saveInstanceJson(instanceData);
-            openFileInEditor(filePath);
-
-            // 5. Extract HTML Fields
-            const fields = classDefinition.fields || [];
-            const htmlFiles = extractHtmlFields(instanceData, fields);
-
-            for (const htmlFile of htmlFiles) {
-                openFileInEditor(htmlFile);
+            // 3. Validate package and class
+            const validation = await validatePackageAndClass(packageId, classId, logger);
+            if (!validation) {
+                return;
             }
+
+            const { classData } = validation;
+
+            // 4. Get instance ID
+            const instanceId = await promptInstanceId(idArg);
+
+            // 5. Fetch instance from API
+            logger.progress(`   🔄 Buscando instância ${instanceId}...`);
+
+            let instanceData;
+            try {
+                instanceData = await get(classData._id, instanceId);
+            } catch (apiError) {
+                const message = apiError instanceof Error ? apiError.message : String(apiError);
+                logger.error(`❌ Erro ao buscar instância: ${message}`);
+                return;
+            }
+
+            if (!instanceData) {
+                logger.error(`❌ Instância não encontrada: ${instanceId}`);
+                return;
+            }
+
+            logger.log(`   ✓ Instância encontrada`);
+
+            // 6. Save to local folder
+            const { instanceDir, extractedFiles } = saveInstanceToLocal(
+                instanceData,
+                packageId,
+                classId,
+                logger
+            );
+
+            // 7. Summary
+            logger.success('\n✅ Instância salva localmente!');
+            logger.info(`   📁 ${instanceDir}`);
+
+            if (extractedFiles.length > 0) {
+                logger.info(`   📄 Arquivos extraídos:`);
+                for (const file of extractedFiles) {
+                    logger.log(`      - ${path.basename(file)}`);
+                }
+            }
+
+            logger.info('\n   Próximos passos:');
+            logger.info('   1. Edite os arquivos conforme necessário');
+            logger.info(`   2. Execute "sydle atualizarInstancia ${packageClass} ${path.basename(instanceDir)}" para enviar ao Sydle`);
 
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            console.error('Operation failed:', message);
+            logger.error(`❌ Erro: ${error instanceof Error ? error.message : String(error)}`);
+            if (options.verbose && error instanceof Error) logger.debug(error.stack);
         }
     });
 

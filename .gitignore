@@ -3,6 +3,9 @@ node_modules
 sydle-dev
 sydle-hom
 sydle-prod
+sydle-dev-data
+sydle-hom-data
+sydle-prod-data
 *.log
 .DS_Store
 .tmp_diff

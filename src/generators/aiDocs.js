@@ -26,6 +26,7 @@ This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) d
 - \`sydle criarMetodo\`: (Alias: \`createMethod\`) Scaffolds a new method.
 - \`sydle excluirMetodo\`: (Alias: \`deleteMethod\`) Deletes a method folder and removes it from Sydle.
 - \`sydle obterClasse <id>\`: (Alias: \`getClass\`) Fetches a class definition.
+- \`sydle dados\`: (Alias: \`data\`) Manage class instances (get, update, search).
 
 ## Class Creation Workflow
 1. \`sydle createClass <package> <name>\` - Creates class locally with \`_revision: "0"\`
@@ -251,9 +252,101 @@ sy.section('Section')     // Visual grouping (required)
 
 ## Script Variables
 \`\`\`javascript
-_object   // Current object
-_parent   // Parent object
-_input    // Input parameters
+_object   // Current object instance
+_parent   // Parent object (if nested)
+_input    // Input parameters (if method has input/ folder)
+_output   // Output object (if method has output/ folder)
+_metadata // Metadata object (only in _getMetadata scripts)
+\`\`\`
+
+## Understanding Script Variables (IMPORTANT FOR AI!)
+
+Before editing any script, you MUST understand the structure of these objects.
+
+### Finding _object Structure
+The \`_object\` variable contains the current class instance.
+
+| File | Location | Content |
+|------|----------|---------|
+| \`class.d.ts\` | \`<Class>/class.d.ts\` | TypeScript interface (\`IClassName\`) |
+| \`class.json\` | \`<Class>/class.json\` | \`fields[]\` array with all field definitions |
+| \`fields.js\` | \`<Class>/fields.js\` | Fields in sy builder format |
+
+**Example**: To edit a script for \`Estagiario\` class:
+\`\`\`
+1. Check: sydle-dev/recursosHumanos/Estagiario/class.d.ts
+2. Look for: interface IEstagiario { ... }
+3. Use fields like: _object.nome, _object.matricula
+\`\`\`
+
+### Finding _input Structure
+The \`_input\` variable exists **only if the method has an \`input/\` subfolder**.
+
+| File | Location | Content |
+|------|----------|---------|
+| \`input.d.ts\` | \`<Method>/input/input.d.ts\` | TypeScript interface |
+| \`inputParameters.json\` | \`<Method>/input/inputParameters.json\` | Full input definition |
+
+**Check if exists**: Look for \`<Method>/input/\` folder before using \`_input\`.
+
+### Finding _output Structure
+The \`_output\` variable exists **only if the method has an \`output/\` subfolder**.
+
+| File | Location | Content |
+|------|----------|---------|
+| \`output.d.ts\` | \`<Method>/output/output.d.ts\` | TypeScript interface |
+| \`outputParameters.json\` | \`<Method>/output/outputParameters.json\` | Full output definition |
+
+**Check if exists**: Look for \`<Method>/output/\` folder before using \`_output\`.
+
+### AI Checklist Before Editing Scripts
+1. ✅ Check \`class.d.ts\` to understand \`_object\` fields
+2. ✅ Check if \`input/\` folder exists → if yes, check \`input.d.ts\`
+3. ✅ Check if \`output/\` folder exists → if yes, check \`output.d.ts\`
+4. ✅ Never invent field names - always verify they exist
+
+## _getMetadata Scripts (CRITICAL!)
+
+Scripts in \`_getMetadata/scripts/\` control field visibility and behavior dynamically.
+
+> **⚠️ IMPORTANT: NEVER replace the field object, only modify its properties!**
+
+### ✅ CORRECT Pattern
+\`\`\`javascript
+if (_object) {
+    _metadata.fields.documento.hidden = !_object.ativo;
+    _metadata.fields.campo.required = true;
+    _metadata.fields.campo.readOnly = true;
+}
+\`\`\`
+
+### ❌ WRONG Pattern (DO NOT DO THIS!)
+\`\`\`javascript
+// WRONG: This replaces the ENTIRE field object, losing all other properties!
+_metadata.fields.documento = { hidden: true };
+\`\`\`
+
+### Available _metadata.fields Properties
+| Property | Type | Description |
+|----------|------|-------------|
+| \`hidden\` | boolean | Hide/show field |
+| \`required\` | boolean | Make field required |
+| \`readOnly\` | boolean | Make field read-only |
+| \`name\` | string | Change field label |
+| \`valueOptions\` | array | Set dropdown options |
+
+### Example: Conditional Field Visibility
+\`\`\`javascript
+if (_object) {
+    // Hide 'documento' when 'ativo' is false
+    _metadata.fields.documento.hidden = !_object.ativo;
+    
+    // Show field only when another field has value
+    if (_object.tipo === 'especial') {
+        _metadata.fields.campoEspecial.hidden = false;
+        _metadata.fields.campoEspecial.required = true;
+    }
+}
 \`\`\`
 
 ## Common Errors
@@ -263,12 +356,34 @@ _input    // Input parameters
 | _revision: "0" | sydle sync to publish |
 | No scripts folder | OK for system methods |
 
+## Managing Data (Instances)
+You can manage class instances (records) locally in the \`sydle-dev-data/\` folder.
+
+### Directory Structure
+\`\`\`
+sydle-dev-data/                   # Data Root (Separate from sydle-dev)
+  Package/
+    Class/
+      InstanceName/
+        instance.json             # Metadata & simple fields
+        script.js                 # Extracted script content
+        template.html             # Extracted HTML content
+\`\`\`
+
+### Data Commands
+\`\`\`bash
+sydle data search <pkg>.<class>                 # List instances
+sydle data get <pkg>.<class> <id>               # Download to sydle-dev-data
+sydle data update <pkg>.<class> <folderName>    # Upload changes
+\`\`\`
+
 ## Essential Commands
 \`\`\`bash
 sydle createClass <pkg> "<Name>" --no-fields  # Create class (scaffold)
 sydle sync <pkg>.<class>                      # Publish to Sydle
 sydle watch <pkg>                             # Auto-sync
 sydle createMethod <pkg> <cls> <met>          # Create method
+sydle data get <pkg>.<class> <id>             # Edit data instance locally
 \`\`\`
 `;
   fs.writeFileSync(path.join(docsDir, 'context.md'), context);
