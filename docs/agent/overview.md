@@ -18,6 +18,7 @@ This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) d
 - [x] **sydle listarInstancia**: (Alias: `listInstance`) Search/list class instances.
 - [x] **sydle obterInstancia**: (Alias: `getInstance`) Downloads an instance for local editing.
 - [x] **sydle atualizarInstancia**: (Alias: `updateInstance`) Uploads local instance changes to Sydle.
+- [x] **sydle listarProcessos**: (Alias: `listProcesses`, `lp`) Downloads all processes and all their versions from a group.
 
 ## Class Creation Workflow
 1. `sydle createClass <package> <name>` - Creates class locally with `_revision: "0"`

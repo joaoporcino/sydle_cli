@@ -48,6 +48,14 @@ sydle-dev/                        # Root (dev/hom/prod)
       myMethod/                   # Method
         method.json               # Method metadata
         scripts/script_1.js       # Method code
+
+sydle-process-dev/               # Process Root
+  GroupName/                     # Process Group
+    group.json                   # Group metadata
+    ProcessName/                 # Process
+      process.json               # Process metadata
+      VersionLabel/              # Version
+        version.json             # Full version metadata
 ```
 
 ## class.json Key Fields
@@ -230,4 +238,5 @@ sydle watch <pkg>                             # Auto-sync
 sydle createMethod <pkg> <cls> <met>          # Create method
 sydle getPackage <pkg>                        # Download package
 sydle obterInstancia <pkg>.<class> <id>       # Edit data instance locally
+sydle listarProcessos <groupIdentifier>       # Download process group structure and ALL versions
 ```
