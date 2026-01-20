@@ -23,21 +23,21 @@ const {
 
 const compareCommand = new Command('comparar')
     .alias('compare')
-    .description('Compare code between two environments (dev, hom, prod)')
-    .argument('[classIdentifier]', 'Class identifier')
-    .argument('[methodIdentifier]', 'Method identifier')
-    .argument('[sourceEnv]', 'Source environment (dev, hom, prod)')
-    .argument('[targetEnv]', 'Target environment (dev, hom, prod)')
+    .description('Compare code between environments (dev/hom/prod)')
+    .argument('[class]', 'Class identifier')
+    .argument('[method]', 'Method identifier')
+    .argument('[source]', 'Source environment (dev, hom, prod)')
+    .argument('[target]', 'Target environment (dev, hom, prod)')
     .option('-v, --verbose', 'Mostrar logs detalhados')
-    .action(async (classIdentifierArg, methodIdentifierArg, sourceEnvArg, targetEnvArg, options) => {
+    .action(async (classArg, methodArg, sourceArg, targetArg, options) => {
         const logger = createLogger(options.verbose);
         try {
             // 1. Interactive flow for missing arguments
             const args = await promptCompareArgs({
-                classIdentifier: classIdentifierArg,
-                methodIdentifier: methodIdentifierArg,
-                sourceEnv: sourceEnvArg,
-                targetEnv: targetEnvArg
+                classIdentifier: classArg,
+                methodIdentifier: methodArg,
+                sourceEnv: sourceArg,
+                targetEnv: targetArg
             });
 
             const { classIdentifier, methodIdentifier, sourceEnv, targetEnv } = args;

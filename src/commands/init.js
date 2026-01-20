@@ -8,7 +8,7 @@ const CLASS_METADATA_ID = '000000000000000000000000';
 
 const initCommand = new Command('iniciar')
     .alias('init')
-    .description('Initialize the Sydle environment with all classes from Sydle')
+    .description('Initialize Sydle environment (all classes)')
     .option('-v, --verbose', 'Mostrar logs detalhados')
     .action(async (options) => {
         const logger = createLogger(options.verbose);

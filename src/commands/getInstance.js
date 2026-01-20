@@ -23,7 +23,7 @@ const path = require('path');
 const obterInstanciaCommand = new Command('obterInstancia')
     .alias('getInstance')
     .description('Baixa uma instância do Sydle para edição local (Get instance for local editing)')
-    .argument('<package.class>', 'Pacote e classe (ex: recursosHumanos.templatesDemissao)')
+    .argument('<path>', 'Pacote e classe (ex: recursosHumanos.templatesDemissao)')
     .argument('[id]', 'ID da instância (_id)')
     .option('-v, --verbose', 'Mostrar logs detalhados')
     .action(async (packageClass, idArg, options) => {

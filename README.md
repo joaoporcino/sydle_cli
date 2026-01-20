@@ -134,6 +134,18 @@ sydle sincronizar recursosHumanos
 Opções:
 * `-v, --verbose`: Exibir logs detalhados.
 
+#### Listar Processos (List Processes)
+Busca processos de um grupo e baixa suas versões e metadados.
+Os arquivos são organizados em `sydle-process-[env]/[Grupo]/[Processo]/[Versao]/version.json`.
+```bash
+sydle listarProcessos [identificador_do_grupo]
+# Alias:
+sydle listProcesses [id]
+sydle lp [id]
+# Exemplo:
+sydle listarProcessos DP
+```
+
 ## Configuração
 
 A URL da API e o Token são armazenados localmente.

@@ -15,6 +15,7 @@ const obterInstanciaCommand = require('./src/commands/getInstance');
 const createClassCommand = require('./src/commands/createClass');
 const listInstanceCommand = require('./src/commands/listInstance');
 const updateInstanceCommand = require('./src/commands/updateInstance');
+const getProcessCommand = require('./src/commands/listProcesses');
 
 program
     .name("sydle")
@@ -33,6 +34,7 @@ program
     .addCommand(obterInstanciaCommand)
     .addCommand(createClassCommand)
     .addCommand(listInstanceCommand)
-    .addCommand(updateInstanceCommand);
+    .addCommand(updateInstanceCommand)
+    .addCommand(getProcessCommand);
 
 program.parse();

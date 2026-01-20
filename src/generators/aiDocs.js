@@ -31,6 +31,7 @@ This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) d
 - [x] **sydle listarInstancia**: (Alias: \`listInstance\`) Search/list class instances.
 - [x] **sydle obterInstancia**: (Alias: \`getInstance\`) Downloads an instance for local editing.
 - [x] **sydle atualizarInstancia**: (Alias: \`updateInstance\`) Uploads local instance changes to Sydle.
+- [x] **sydle listarProcessos**: (Alias: \`listProcesses\`, \`lp\`) Downloads all processes and all their versions from a group.
 
 ## Class Creation Workflow
 1. \`sydle createClass <package> <name>\` - Creates class locally with \`_revision: "0"\`
@@ -212,6 +213,14 @@ sydle-dev/                        # Root (dev/hom/prod)
       myMethod/                   # Method
         method.json               # Method metadata
         scripts/script_1.js       # Method code
+
+sydle-process-dev/               # Process Root
+  GroupName/                     # Process Group
+    group.json                   # Group metadata
+    ProcessName/                 # Process
+      process.json               # Process metadata
+      VersionLabel/              # Version
+        version.json             # Full version metadata
 \`\`\`
 
 ## class.json Key Fields
@@ -394,6 +403,7 @@ sydle watch <pkg>                             # Auto-sync
 sydle createMethod <pkg> <cls> <met>          # Create method
 sydle getPackage <pkg>                        # Download package
 sydle obterInstancia <pkg>.<class> <id>       # Edit data instance locally
+sydle listarProcessos <groupIdentifier>       # Download process group structure and ALL versions
 \`\`\`
 `;
   fs.writeFileSync(path.join(docsDir, 'context.md'), context);

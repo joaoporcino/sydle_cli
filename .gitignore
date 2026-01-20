@@ -6,6 +6,9 @@ sydle-prod
 sydle-dev-data
 sydle-hom-data
 sydle-prod-data
+sydle-process-dev
+sydle-process-hom
+sydle-process-prod
 *.log
 .DS_Store
 .tmp_diff
