@@ -21,13 +21,16 @@ This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) d
 - **Authentication**: Handled automatically via \`authFlow.js\`. If a command fails with 401, suggest \`sydle login\`.
 
 ## Core Commands for Agents
-- \`sydle criarClasse\`: (Alias: \`createClass\`) Creates a new class **locally**. Use \`sync\` to publish to Sydle.
-- \`sydle sincronizar <path>\`: (Alias: \`sync\`) Syncs classes, fields, and methods to Sydle. **Creates new classes automatically**.
-- \`sydle monitorar <package>\`: (Alias: \`watch\`) Monitors changes and syncs automatically.
-- \`sydle criarMetodo\`: (Alias: \`createMethod\`) Scaffolds a new method.
-- \`sydle excluirMetodo\`: (Alias: \`deleteMethod\`) Deletes a method folder and removes it from Sydle.
-- \`sydle obterClasse <id>\`: (Alias: \`getClass\`) Fetches a class definition.
-- \`sydle dados\`: (Alias: \`data\`) Manage class instances (get, update, search).
+- [x] **sydle obterPacote**: (Alias: \`getPackage\`) Fetches all classes from a package.
+- [x] **sydle criarClasse**: (Alias: \`createClass\`) Creates a new class **locally**. Use \`sync\` to publish to Sydle.
+- [x] **sydle sincronizar <path>**: (Alias: \`sync\`) Syncs classes, fields, and methods to Sydle. **Creates new classes automatically**.
+- [x] **sydle monitorar <package>**: (Alias: \`watch\`) Monitors changes and syncs automatically.
+- [x] **sydle criarMetodo**: (Alias: \`createMethod\`) Scaffolds a new method.
+- [x] **sydle excluirMetodo**: (Alias: \`deleteMethod\`) Deletes a method folder and removes it from Sydle.
+- [x] **sydle obterClasse <id>**: (Alias: \`getClass\`) Fetches a class definition.
+- [x] **sydle listarInstancia**: (Alias: \`listInstance\`) Search/list class instances.
+- [x] **sydle obterInstancia**: (Alias: \`getInstance\`) Downloads an instance for local editing.
+- [x] **sydle atualizarInstancia**: (Alias: \`updateInstance\`) Uploads local instance changes to Sydle.
 
 ## Class Creation Workflow
 1. \`sydle createClass <package> <name>\` - Creates class locally with \`_revision: "0"\`
@@ -150,6 +153,11 @@ Skipped (no scripts): 15
 - Deletes the local folder AND handles Sydle deletion.
 - **Safety**: Includes confirmation prompt and auto-rollback if declined.
 - **Protection**: Cannot delete system methods (\`_*\`).
+
+## sydle obterPacote (Alias: getPackage)
+**Usage**: \`sydle getPackage [identifier]\`
+- Downloads all classes from a Sydle package to the local environment.
+- If no identifier is provided, launches an interactive selection.
 `;
   fs.writeFileSync(path.join(commandsDir, 'create-delete.md'), createDelete);
 
@@ -373,9 +381,9 @@ sydle-dev-data/                   # Data Root (Separate from sydle-dev)
 
 ### Data Commands
 \`\`\`bash
-sydle data search <pkg>.<class>                 # List instances
-sydle data get <pkg>.<class> <id>               # Download to sydle-dev-data
-sydle data update <pkg>.<class> <folderName>    # Upload changes
+sydle listarInstancia <pkg>.<class>              # List instances (Alias: listInstance)
+sydle obterInstancia <pkg>.<class> <id>          # Download for editing (Alias: getInstance)
+sydle atualizarInstancia <pkg>.<class> <folder>  # Upload changes (Alias: updateInstance)
 \`\`\`
 
 ## Essential Commands
@@ -384,7 +392,8 @@ sydle createClass <pkg> "<Name>" --no-fields  # Create class (scaffold)
 sydle sync <pkg>.<class>                      # Publish to Sydle
 sydle watch <pkg>                             # Auto-sync
 sydle createMethod <pkg> <cls> <met>          # Create method
-sydle data get <pkg>.<class> <id>             # Edit data instance locally
+sydle getPackage <pkg>                        # Download package
+sydle obterInstancia <pkg>.<class> <id>       # Edit data instance locally
 \`\`\`
 `;
   fs.writeFileSync(path.join(docsDir, 'context.md'), context);

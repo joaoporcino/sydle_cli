@@ -8,13 +8,16 @@ This CLI allows you to manage Sydle system entities (Classes, Methods, Fields) d
 - **Authentication**: Handled automatically via `authFlow.js`. If a command fails with 401, suggest `sydle login`.
 
 ## Core Commands for Agents
-- `sydle criarClasse`: (Alias: `createClass`) Creates a new class **locally**. Use `sync` to publish to Sydle.
-- `sydle sincronizar <path>`: (Alias: `sync`) Syncs classes, fields, and methods to Sydle. **Creates new classes automatically**.
-- `sydle monitorar <package>`: (Alias: `watch`) Monitors changes and syncs automatically.
-- `sydle criarMetodo`: (Alias: `createMethod`) Scaffolds a new method.
-- `sydle excluirMetodo`: (Alias: `deleteMethod`) Deletes a method folder and removes it from Sydle.
-- `sydle obterClasse <id>`: (Alias: `getClass`) Fetches a class definition.
-- `sydle dados`: (Alias: `data`) Manage class instances (get, update, search).
+- [x] **sydle obterPacote**: (Alias: `getPackage`) Fetches all classes from a package.
+- [x] **sydle criarClasse**: (Alias: `createClass`) Creates a new class **locally**. Use `sync` to publish to Sydle.
+- [x] **sydle sincronizar <path>**: (Alias: `sync`) Syncs classes, fields, and methods to Sydle. **Creates new classes automatically**.
+- [x] **sydle monitorar <package>**: (Alias: `watch`) Monitors changes and syncs automatically.
+- [x] **sydle criarMetodo**: (Alias: `createMethod`) Scaffolds a new method.
+- [x] **sydle excluirMetodo**: (Alias: `deleteMethod`) Deletes a method folder and removes it from Sydle.
+- [x] **sydle obterClasse <id>**: (Alias: `getClass`) Fetches a class definition.
+- [x] **sydle listarInstancia**: (Alias: `listInstance`) Search/list class instances.
+- [x] **sydle obterInstancia**: (Alias: `getInstance`) Downloads an instance for local editing.
+- [x] **sydle atualizarInstancia**: (Alias: `updateInstance`) Uploads local instance changes to Sydle.
 
 ## Class Creation Workflow
 1. `sydle createClass <package> <name>` - Creates class locally with `_revision: "0"`

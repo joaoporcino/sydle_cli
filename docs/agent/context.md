@@ -217,9 +217,9 @@ sydle-dev-data/                   # Data Root (Separate from sydle-dev)
 
 ### Data Commands
 ```bash
-sydle data search <pkg>.<class>                 # List instances
-sydle data get <pkg>.<class> <id>               # Download to sydle-dev-data
-sydle data update <pkg>.<class> <folderName>    # Upload changes
+sydle listarInstancia <pkg>.<class>              # List instances (Alias: listInstance)
+sydle obterInstancia <pkg>.<class> <id>          # Download for editing (Alias: getInstance)
+sydle atualizarInstancia <pkg>.<class> <folder>  # Upload changes (Alias: updateInstance)
 ```
 
 ## Essential Commands
@@ -228,5 +228,6 @@ sydle createClass <pkg> "<Name>" --no-fields  # Create class (scaffold)
 sydle sync <pkg>.<class>                      # Publish to Sydle
 sydle watch <pkg>                             # Auto-sync
 sydle createMethod <pkg> <cls> <met>          # Create method
-sydle data get <pkg>.<class> <id>             # Edit data instance locally
+sydle getPackage <pkg>                        # Download package
+sydle obterInstancia <pkg>.<class> <id>       # Edit data instance locally
 ```
