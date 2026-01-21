@@ -10,9 +10,18 @@ const { get } = require('../api/main');
 const fs = require('fs');
 const path = require('path');
 const { logger } = require('../utils/logger');
+const {
+    generateMethodFiles,
+    generateFieldsSchema,
+    generateClassDts,
+    generateClassSchema,
+    generateProcessRolesFiles,
+    generateDiagramFiles
+} = require('../generators');
 
 const PROCESS_GROUP_CLASS_ID = '595c20500000000000000133';
 const PROCESS_VERSION_CLASS_ID = '595c20500000000000000110';
+const CLASS_CLASS_ID = '000000000000000000000000';
 
 /**
  * Sanitizes a name to be used as a folder name
@@ -34,6 +43,42 @@ function sanitizeFolderName(name) {
         .replace(/^_|_$/g, '');           // Trim underscores
 }
 
+/**
+ * Generate pin structure for a process version
+ * @param {string} versionPath - Path to the version folder
+ * @param {Object} versionData - Version data object
+ * @param {string} rootPath - Root path (sydle-process-[env])
+ * @param {Map} classIdToIdentifier - Map of class IDs to identifiers
+ */
+async function generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier) {
+    const pinPath = path.join(versionPath, 'pin');
+
+    if (!fs.existsSync(pinPath)) {
+        fs.mkdirSync(pinPath, { recursive: true });
+    }
+
+    // Save version data as class.json inside pin/
+    fs.writeFileSync(
+        path.join(pinPath, 'class.json'),
+        JSON.stringify(versionData, null, 2)
+    );
+
+    // Generate method files for pin (reuse existing generator)
+    generateMethodFiles(pinPath, versionData.methods || [], rootPath, classIdToIdentifier, versionData);
+
+    // Generate fields schema (reuse existing generator)
+    if (versionData.fields && versionData.fields.length > 0) {
+        generateFieldsSchema(versionData, pinPath, rootPath);
+    }
+
+    // Generate class.d.ts for pin types (reuse existing generator)
+    await generateClassDts(versionData, pinPath, { classIdToIdentifier, classId: CLASS_CLASS_ID });
+
+    // Generate class.schema.js (reuse existing generator)
+    generateClassSchema(versionData, pinPath);
+
+    logger.debug(`   📁 Generated pin/ structure with ${(versionData.methods || []).length} methods`);
+}
 
 
 /**
@@ -41,10 +86,11 @@ function sanitizeFolderName(name) {
  * @param {Object[]} processesData - Array of process objects to process
  * @param {Object} [options] - Processing options
  * @param {string} [options.description] - Description for logging
+ * @param {boolean} [options.currentVersionOnly=false] - If true, fetch only current version
  * @returns {Promise<Object>} Processing results
  */
 async function processProcesses(processesData, options = {}) {
-    const { description } = options;
+    const { description, currentVersionOnly = false } = options;
 
     logger.info(description || 'Processing processes...');
 
@@ -62,8 +108,38 @@ async function processProcesses(processesData, options = {}) {
     }
 
     const groupInfoMap = new Map();
+    const classIdToIdentifier = new Map();
     let processedCount = 0;
     let versionsCount = 0;
+
+    // Phase 0: Load existing classes from sydle-dev for type resolution
+    logger.info('Phase 0: Loading existing classes for type resolution...');
+    const sydleDevPath = path.join(process.cwd(), `sydle-${env}`);
+    if (fs.existsSync(sydleDevPath)) {
+        const loadClassesRecursively = (dir) => {
+            const items = fs.readdirSync(dir);
+            for (const item of items) {
+                const itemPath = path.join(dir, item);
+                const stat = fs.statSync(itemPath);
+
+                if (stat.isDirectory()) {
+                    const classJsonPath = path.join(itemPath, 'class.json');
+                    if (fs.existsSync(classJsonPath)) {
+                        try {
+                            const classData = JSON.parse(fs.readFileSync(classJsonPath, 'utf8'));
+                            classIdToIdentifier.set(classData._id, classData.identifier);
+                        } catch (error) {
+                            // Silently skip malformed files
+                        }
+                    }
+                    loadClassesRecursively(itemPath);
+                }
+            }
+        };
+
+        loadClassesRecursively(sydleDevPath);
+        logger.debug(`Loaded ${classIdToIdentifier.size} existing classes for type resolution.`);
+    }
 
     logger.info(`Phase 1: Processing ${processesData.length} processes...`);
 
@@ -119,38 +195,84 @@ async function processProcesses(processesData, options = {}) {
                 JSON.stringify(processData, null, 2)
             );
 
-            // 4. Fetch all versions for this process
-            try {
-                const { searchPaginated } = require('../api/main');
-                const versionQuery = {
-                    query: {
-                        term: { "process._id": processData._id }
-                    },
-                    sort: [{ "_creationDate": "desc" }]
-                };
+            // 4. Fetch versions for this process
+            if (currentVersionOnly) {
+                // Fetch only the current version
+                if (processData.currentVersion?._id) {
+                    try {
+                        const versionData = await get(PROCESS_VERSION_CLASS_ID, processData.currentVersion._id);
 
-                await searchPaginated(PROCESS_VERSION_CLASS_ID, versionQuery, 50, async (hits) => {
-                    for (const hit of hits) {
-                        const versionData = hit._source;
-                        if (!versionData) continue;
-
-                        const versionLabel = sanitizeFolderName(versionData.versionLabel || 'unknown');
+                        const versionLabel = sanitizeFolderName(versionData.versionLabel || 'current');
                         const versionPath = path.join(processPath, versionLabel);
 
                         if (!fs.existsSync(versionPath)) {
                             fs.mkdirSync(versionPath, { recursive: true });
                         }
 
-                        // Save version.json (keeping full metadata as requested)
                         fs.writeFileSync(
                             path.join(versionPath, 'version.json'),
                             JSON.stringify(versionData, null, 2)
                         );
                         versionsCount++;
+                        logger.debug(`   📌 Fetched current version: ${versionLabel}`);
+
+                        // Generate pin structure
+                        await generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier);
+
+                        // Generate processRoles structure
+                        generateProcessRolesFiles(versionPath, versionData.processRoles);
+
+                        // Generate diagram structure
+                        await generateDiagramFiles(versionPath, versionData.diagram);
+                    } catch (vError) {
+                        logger.warn(`   ⚠ Failed to fetch current version for process ${processData.identifier}: ${vError.message}`);
                     }
-                });
-            } catch (vError) {
-                logger.warn(`   ⚠ Failed to fetch versions for process ${processData.identifier}: ${vError.message}`);
+                } else {
+                    logger.warn(`   ⚠ Process ${processData.identifier} has no currentVersion field.`);
+                }
+            } else {
+                // Fetch all versions using pagination (existing behavior)
+                try {
+                    const { searchPaginated } = require('../api/main');
+                    const versionQuery = {
+                        query: {
+                            term: { "process._id": processData._id }
+                        },
+                        sort: [{ "_creationDate": "desc" }]
+                    };
+
+                    await searchPaginated(PROCESS_VERSION_CLASS_ID, versionQuery, 50, async (hits) => {
+                        for (const hit of hits) {
+                            const versionData = hit._source;
+                            if (!versionData) continue;
+
+                            const versionLabel = sanitizeFolderName(versionData.versionLabel || 'unknown');
+                            const versionPath = path.join(processPath, versionLabel);
+
+                            if (!fs.existsSync(versionPath)) {
+                                fs.mkdirSync(versionPath, { recursive: true });
+                            }
+
+                            // Save version.json (keeping full metadata as requested)
+                            fs.writeFileSync(
+                                path.join(versionPath, 'version.json'),
+                                JSON.stringify(versionData, null, 2)
+                            );
+                            versionsCount++;
+
+                            // Generate pin structure
+                            await generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier);
+
+                            // Generate processRoles structure
+                            generateProcessRolesFiles(versionPath, versionData.processRoles);
+
+                            // Generate diagram structure
+                            await generateDiagramFiles(versionPath, versionData.diagram);
+                        }
+                    });
+                } catch (vError) {
+                    logger.warn(`   ⚠ Failed to fetch versions for process ${processData.identifier}: ${vError.message}`);
+                }
             }
 
             processedCount++;

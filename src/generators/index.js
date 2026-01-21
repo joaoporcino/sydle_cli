@@ -10,6 +10,8 @@ const { generateMethodFiles } = require('./methodFiles');
 const { generateInputFiles } = require('./inputFiles');
 const { mapToTsType, mapToZodSchema, getRelativePath } = require('./utils');
 const { generateAiDocs } = require('./aiDocs');
+const { generateProcessRolesFiles } = require('./processRolesFiles');
+const { generateDiagramFiles } = require('./diagramFiles');
 
 module.exports = {
     generateClassDts,
@@ -25,5 +27,7 @@ module.exports = {
     mapToTsType,
     mapToZodSchema,
     getRelativePath,
-    generateAiDocs
+    generateAiDocs,
+    generateProcessRolesFiles,
+    generateDiagramFiles
 };
