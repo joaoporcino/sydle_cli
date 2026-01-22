@@ -13,6 +13,7 @@ const path = require('path');
 const config = require('./config');
 const { performLogin } = require('./authFlow');
 const { createClient } = require('../api/client');
+const { logger: defaultLogger } = require('./logger');
 
 /**
  * Prompts for compare command arguments
@@ -170,12 +171,12 @@ function isValidUrl(u) {
  * @param {string} envAlias - Environment alias
  * @returns {Promise<void>}
  */
-async function ensureEnvironmentAccess(envAlias) {
+async function ensureEnvironmentAccess(envAlias, logger = defaultLogger) {
     let url = resolveUrl(envAlias);
     let token = isValidUrl(url) ? getTokenForUrl(url) : null;
 
     if (!isValidUrl(url) || !token) {
-        console.log(`\n! Access missing for environment: ${envAlias} (URL: ${url})`);
+        logger.warn(`\n! Access missing for environment: ${envAlias} (URL: ${url})`);
 
         const { shouldLogin } = await inquirer.prompt([{
             type: 'confirm',
@@ -262,7 +263,7 @@ async function fetchMethodData(baseUrl, envName, token, classIdentifier, methodI
  * @param {string} options.sourceUrl - Source URL
  * @param {string} options.targetUrl - Target URL
  */
-function generateDiffFiles({ sourceScripts, targetScripts, scriptsPath, sourceEnv, targetEnv, sourceUrl, targetUrl }) {
+function generateDiffFiles({ sourceScripts, targetScripts, scriptsPath, sourceEnv, targetEnv, sourceUrl, targetUrl }, logger = defaultLogger) {
     if (!fs.existsSync(scriptsPath)) {
         fs.mkdirSync(scriptsPath, { recursive: true });
     }
@@ -271,8 +272,8 @@ function generateDiffFiles({ sourceScripts, targetScripts, scriptsPath, sourceEn
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
     const maxScripts = Math.max(sourceScripts.length, targetScripts.length);
-    console.log(`\nFound ${sourceScripts.length} script(s) in Source and ${targetScripts.length} in Target.`);
-    console.log(`Output folder: ${scriptsPath}`);
+    logger.info(`\nFound ${sourceScripts.length} script(s) in Source and ${targetScripts.length} in Target.`);
+    logger.info(`Output folder: ${scriptsPath}`);
 
     for (let i = 0; i < maxScripts; i++) {
         const sScript = sourceScripts[i] || '';
@@ -286,7 +287,7 @@ function generateDiffFiles({ sourceScripts, targetScripts, scriptsPath, sourceEn
             fs.writeFileSync(scriptPath, sScript);
         }
 
-        console.log(`Target Script: ${scriptFileName}`);
+        logger.log(`Target Script: ${scriptFileName}`);
 
         // Prepare temporary files for 3-way merge
         const sourceFile = path.join(tempDir, `merge_local_${i + 1}.js`);
@@ -301,10 +302,10 @@ function generateDiffFiles({ sourceScripts, targetScripts, scriptsPath, sourceEn
         const isVsCode = process.env.TERM_PROGRAM === 'vscode';
 
         if (i === 0 && isVsCode) {
-            console.log('Opening VS Code Merge Editor...');
-            console.log('  Current (Left): Source Env');
-            console.log('  Incoming (Right): Target Env');
-            console.log('  Result: Saving will update script file');
+            logger.info('Opening VS Code Merge Editor...');
+            logger.log('  Current (Left): Source Env');
+            logger.log('  Incoming (Right): Target Env');
+            logger.log('  Result: Saving will update script file');
 
             const { exec } = require('child_process');
             exec(`code --merge "${sourceFile}" "${targetFile}" "${baseFile}" "${scriptPath}"`);
@@ -320,8 +321,8 @@ ${tScript}
             const fullDiffPath = path.join(scriptsPath, diffFileName);
             fs.writeFileSync(fullDiffPath, conflictContent);
 
-            if (i === 0) console.log(`Manual merge required (Editor auto-launch skipped).`);
-            console.log(`Generated standard conflict file: ${diffFileName}`);
+            if (i === 0) logger.warn(`Manual merge required (Editor auto-launch skipped).`);
+            logger.success(`Generated standard conflict file: ${diffFileName}`);
         }
     }
 }

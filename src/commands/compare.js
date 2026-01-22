@@ -43,8 +43,8 @@ const compareCommand = new Command('comparar')
             const { classIdentifier, methodIdentifier, sourceEnv, targetEnv } = args;
 
             // 2. Ensure access to both environments
-            await ensureEnvironmentAccess(sourceEnv);
-            await ensureEnvironmentAccess(targetEnv);
+            await ensureEnvironmentAccess(sourceEnv, logger);
+            await ensureEnvironmentAccess(targetEnv, logger);
 
             // 3. Resolve URLs and tokens
             const sourceUrl = resolveUrl(sourceEnv);
@@ -90,7 +90,7 @@ const compareCommand = new Command('comparar')
                 targetEnv,
                 sourceUrl,
                 targetUrl
-            });
+            }, logger);
 
             logger.success('Open the conflict file(s) to view and merge changes manually if preferred.');
 
