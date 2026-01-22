@@ -8,9 +8,9 @@ const { createLogger } = require('../utils/logger');
 const { syncMethodCore, ensureClassExists } = require('../core/syncLogic');
 const { syncFieldsCore } = require('../core/syncFields');
 
-const syncCommand = new Command('sincronizar')
-    .alias('sync')
-    .description('Sync script files to Sydle')
+const syncCommand = new Command('sincronizarClasse')
+    .alias('syncClass')
+    .description('Sync script files to Sydle (Classes only)')
     .argument('[path]', 'Optional path: package.class.method, package.class, or package')
     .option('-v, --verbose', 'Show verbose logging')
     .action(async (syncPath, options) => {
@@ -77,7 +77,7 @@ const syncCommand = new Command('sincronizar')
                 }
             }
 
-            // First, ensure all classes exist in Sydle
+            // Sync Classes first
             const classFiles = await glob(classPattern, {
                 cwd: rootPath,
                 absolute: false,

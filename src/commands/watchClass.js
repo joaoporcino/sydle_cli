@@ -10,9 +10,9 @@ const { scaffoldMethod } = require('../utils/scaffoldMethod');
 const { handleMethodDeletion } = require('../utils/deleteMethod');
 const { syncFieldsCore } = require('../core/syncFields');
 
-const watchCommand = new Command('monitorar')
-    .alias('watch')
-    .description('Watch for changes in script files and sync to Sydle')
+const watchCommand = new Command('monitorarClasse')
+    .alias('watchClass')
+    .description('Watch for changes in script files and sync to Sydle (Classes only)')
     .argument('[package]', 'Optional package to watch (e.g., recursosHumanos)')
     .option('-v, --verbose', 'Show verbose logging')
     .action(async (packageFilter, options) => {
@@ -31,6 +31,7 @@ const watchCommand = new Command('monitorar')
 
             const rootFolder = `sydle-${env}`;
             const rootPath = path.join(process.cwd(), rootFolder);
+
 
             if (!fs.existsSync(rootPath)) {
                 logger.error(`❌ Directory not found: ${rootPath}`);
