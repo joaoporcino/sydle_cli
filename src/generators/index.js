@@ -12,6 +12,7 @@ const { mapToTsType, mapToZodSchema, getRelativePath } = require('./utils');
 const { generateAiDocs } = require('./aiDocs');
 const { generateProcessRolesFiles } = require('./processRolesFiles');
 const { generateDiagramFiles } = require('./diagramFiles');
+const { generateDiagramMermaid } = require('./diagramMermaid');
 
 module.exports = {
     generateClassDts,
@@ -29,5 +30,6 @@ module.exports = {
     getRelativePath,
     generateAiDocs,
     generateProcessRolesFiles,
-    generateDiagramFiles
+    generateDiagramFiles,
+    generateDiagramMermaid
 };

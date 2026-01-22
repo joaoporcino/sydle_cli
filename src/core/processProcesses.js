@@ -223,7 +223,7 @@ async function processProcesses(processesData, options = {}) {
                         generateProcessRolesFiles(versionPath, versionData.processRoles);
 
                         // Generate diagram structure
-                        await generateDiagramFiles(versionPath, versionData.diagram);
+                        await generateDiagramFiles(versionPath, versionData.diagram, rootPath, classIdToIdentifier);
                     } catch (vError) {
                         logger.warn(`   ⚠ Failed to fetch current version for process ${processData.identifier}: ${vError.message}`);
                     }
@@ -267,7 +267,7 @@ async function processProcesses(processesData, options = {}) {
                             generateProcessRolesFiles(versionPath, versionData.processRoles);
 
                             // Generate diagram structure
-                            await generateDiagramFiles(versionPath, versionData.diagram);
+                            await generateDiagramFiles(versionPath, versionData.diagram, rootPath, classIdToIdentifier);
                         }
                     });
                 } catch (vError) {

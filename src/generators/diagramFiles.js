@@ -51,8 +51,10 @@ async function resolveSettings(obj) {
  * Generate diagram structure for a process version
  * @param {string} versionPath - Path to the version folder
  * @param {Object} diagram - Diagram reference object with _id and _classId
+ * @param {string} rootPath - Root path (sydle-process-[env])
+ * @param {Map} classIdToIdentifier - Map of class IDs to identifiers
  */
-async function generateDiagramFiles(versionPath, diagram) {
+async function generateDiagramFiles(versionPath, diagram, rootPath, classIdToIdentifier) {
     if (!diagram?._id || !diagram?._classId) {
         return;
     }
@@ -78,7 +80,71 @@ async function generateDiagramFiles(versionPath, diagram) {
             JSON.stringify(resolvedDiagramData, null, 2)
         );
 
-        logger.debug(`   📊 Fetched and saved diagram with resolved settings`);
+        // Generate diagram elements using generic generator
+        const { generateDiagramElementFiles } = require('./diagramElementFiles');
+
+        let totalFiltered = 0;
+
+        // Filter and generate tasks (only active elements)
+        if (resolvedDiagramData.tasks && resolvedDiagramData.tasks.length > 0) {
+            const activeTasks = resolvedDiagramData.tasks.filter(task => task.active !== false);
+            const filteredCount = resolvedDiagramData.tasks.length - activeTasks.length;
+            if (filteredCount > 0) {
+                logger.debug(`      ⏭ Filtered ${filteredCount} inactive task(s)`);
+                totalFiltered += filteredCount;
+            }
+            if (activeTasks.length > 0) {
+                generateDiagramElementFiles(diagramPath, activeTasks, 'tasks', rootPath, classIdToIdentifier);
+            }
+        }
+
+        // Filter and generate subprocesses (only active elements)
+        if (resolvedDiagramData.subprocesses && resolvedDiagramData.subprocesses.length > 0) {
+            const activeSubprocesses = resolvedDiagramData.subprocesses.filter(subprocess => subprocess.active !== false);
+            const filteredCount = resolvedDiagramData.subprocesses.length - activeSubprocesses.length;
+            if (filteredCount > 0) {
+                logger.debug(`      ⏭ Filtered ${filteredCount} inactive subprocess(es)`);
+                totalFiltered += filteredCount;
+            }
+            if (activeSubprocesses.length > 0) {
+                generateDiagramElementFiles(diagramPath, activeSubprocesses, 'subprocesses', rootPath, classIdToIdentifier);
+            }
+        }
+
+        // Filter and generate events (only active elements)
+        if (resolvedDiagramData.events && resolvedDiagramData.events.length > 0) {
+            const activeEvents = resolvedDiagramData.events.filter(event => event.active !== false);
+            const filteredCount = resolvedDiagramData.events.length - activeEvents.length;
+            if (filteredCount > 0) {
+                logger.debug(`      ⏭ Filtered ${filteredCount} inactive event(s)`);
+                totalFiltered += filteredCount;
+            }
+            if (activeEvents.length > 0) {
+                generateDiagramElementFiles(diagramPath, activeEvents, 'events', rootPath, classIdToIdentifier);
+            }
+        }
+
+        // Filter and generate gateways (only active elements)
+        if (resolvedDiagramData.gateways && resolvedDiagramData.gateways.length > 0) {
+            const activeGateways = resolvedDiagramData.gateways.filter(gateway => gateway.active !== false);
+            const filteredCount = resolvedDiagramData.gateways.length - activeGateways.length;
+            if (filteredCount > 0) {
+                logger.debug(`      ⏭ Filtered ${filteredCount} inactive gateway(s)`);
+                totalFiltered += filteredCount;
+            }
+            if (activeGateways.length > 0) {
+                generateDiagramElementFiles(diagramPath, activeGateways, 'gateways', rootPath, classIdToIdentifier);
+            }
+        }
+
+        const filterMessage = totalFiltered > 0
+            ? ` (${totalFiltered} inactive element(s) filtered)`
+            : '';
+        logger.debug(`   📊 Fetched and saved diagram with resolved settings${filterMessage}`);
+
+        // Generate Mermaid diagram visualization
+        const { generateDiagramMermaid } = require('./diagramMermaid');
+        generateDiagramMermaid(diagramPath, resolvedDiagramData);
     } catch (error) {
         logger.warn(`   ⚠ Failed to fetch diagram: ${error.message}`);
     }
