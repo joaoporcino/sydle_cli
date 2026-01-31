@@ -28,11 +28,11 @@ function taskNameToSchemaName(taskName) {
 
 /**
  * Generate schema.js file for a task
- * @param {string} taskPath - Path to the task folder
+ * @param {string} fieldsPath - Path to the fields folder
  * @param {Object} taskSettings - Task settings object
+ * @param {string} taskFolderName - Task folder name for schema naming
  */
-function generateTaskSchema(taskPath, taskSettings) {
-    const taskFolderName = path.basename(taskPath);
+function generateTaskSchema(fieldsPath, taskSettings, taskFolderName) {
     const schemaName = taskNameToSchemaName(taskFolderName);
     const taskDisplayName = taskSettings._name || taskFolderName;
 
@@ -45,7 +45,7 @@ function generateTaskSchema(taskPath, taskSettings) {
     schemaContent += `  ${schemaName}\n`;
     schemaContent += `};\n`;
 
-    fs.writeFileSync(path.join(taskPath, 'task.schema.js'), schemaContent);
+    fs.writeFileSync(path.join(fieldsPath, 'task.schema.js'), schemaContent);
 }
 
 module.exports = {

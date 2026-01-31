@@ -63,12 +63,21 @@ async function generatePinStructure(versionPath, versionData, rootPath, classIdT
         JSON.stringify(versionData, null, 2)
     );
 
-    // Generate method files for pin (reuse existing generator)
+    // Generate method files for pin (reuse existing generator - creates methods/ folder)
     generateMethodFiles(pinPath, versionData.methods || [], rootPath, classIdToIdentifier, versionData);
 
-    // Generate fields schema (reuse existing generator)
+    // Generate fields schema (reuse existing generator - create fields/ folder)
     if (versionData.fields && versionData.fields.length > 0) {
-        generateFieldsSchema(versionData, pinPath, rootPath);
+        const fieldsFolder = path.join(pinPath, 'fields');
+        if (!fs.existsSync(fieldsFolder)) {
+            fs.mkdirSync(fieldsFolder, { recursive: true });
+        }
+        generateFieldsSchema(versionData, fieldsFolder, rootPath);
+    }
+
+    // Generate processRoles inside pin/ directory
+    if (versionData.processRoles && versionData.processRoles.length > 0) {
+        generateProcessRolesFiles(pinPath, versionData.processRoles);
     }
 
     // Generate class.d.ts for pin types (reuse existing generator)
@@ -77,7 +86,7 @@ async function generatePinStructure(versionPath, versionData, rootPath, classIdT
     // Generate class.schema.js (reuse existing generator)
     generateClassSchema(versionData, pinPath);
 
-    logger.debug(`   📁 Generated pin/ structure with ${(versionData.methods || []).length} methods`);
+    logger.debug(`   📁 Generated pin/ structure with ${(versionData.methods || []).length} methods, ${(versionData.processRoles || []).length} roles`);
 }
 
 
@@ -216,11 +225,8 @@ async function processProcesses(processesData, options = {}) {
                         versionsCount++;
                         logger.debug(`   📌 Fetched current version: ${versionLabel}`);
 
-                        // Generate pin structure
+                        // Generate pin structure (includes processRoles)
                         await generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier);
-
-                        // Generate processRoles structure
-                        generateProcessRolesFiles(versionPath, versionData.processRoles);
 
                         // Generate diagram structure
                         await generateDiagramFiles(versionPath, versionData.diagram, rootPath, classIdToIdentifier);
@@ -260,11 +266,8 @@ async function processProcesses(processesData, options = {}) {
                             );
                             versionsCount++;
 
-                            // Generate pin structure
+                            // Generate pin structure (includes processRoles)
                             await generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier);
-
-                            // Generate processRoles structure
-                            generateProcessRolesFiles(versionPath, versionData.processRoles);
 
                             // Generate diagram structure
                             await generateDiagramFiles(versionPath, versionData.diagram, rootPath, classIdToIdentifier);

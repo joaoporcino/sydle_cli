@@ -20,8 +20,14 @@ const { generateMetadataFiles } = require('./metadataFiles');
 function generateMethodFiles(basePath, methods, rootPath, classIdToIdentifier, fullClassData = null) {
     if (!methods || methods.length === 0) return;
 
+    // Create methods folder
+    const methodsFolder = path.join(basePath, 'methods');
+    if (!fs.existsSync(methodsFolder)) {
+        fs.mkdirSync(methodsFolder, { recursive: true });
+    }
+
     methods.forEach(method => {
-        const methodPath = path.join(basePath, method.identifier);
+        const methodPath = path.join(methodsFolder, method.identifier);
 
         if (!fs.existsSync(methodPath)) {
             fs.mkdirSync(methodPath, { recursive: true });

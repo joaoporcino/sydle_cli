@@ -46,6 +46,24 @@ const { logger } = require('../utils/logger');
  * @param {boolean} [field.required] - Whether the field is required
  * @param {boolean} [field.readOnly] - Whether the field is read-only
  * @param {boolean} [field.searchable] - Whether the field is searchable
+ * @param {boolean} [field.hidden] - Whether the field is hidden
+ * @param {boolean} [field.multiple] - Whether the field accepts multiple values
+ * @param {boolean} [field.unique] - Whether the field value must be unique
+ * @param {boolean} [field.i18n] - Whether the field supports internationalization
+ * @param {boolean} [field.encrypted] - Whether the field value is encrypted
+ * @param {boolean} [field.embedded] - Whether the field is embedded
+ * @param {boolean} [field.shiftable] - Whether the field value can be shifted
+ * @param {boolean} [field.displayOnEditMode] - Whether to display on edit mode
+ * @param {boolean} [field.calculated] - Whether the field is calculated
+ * @param {string} [field.engine] - Calculation engine
+ * @param {string} [field.valueExpression] - Calculation expression
+ * @param {string} [field.relevancy] - Field relevancy
+ * @param {number} [field.minMultiplicity] - Minimum multiplicity
+ * @param {number} [field.maxMultiplicity] - Maximum multiplicity
+ * @param {any} [field.defaultValue] - Default value
+ * @param {Array<any>} [field.valueOptions] - Value options
+ * @param {string} [field.editHelp] - Helper text for editing
+ * @param {string} [field.calculationStrategy] - Strategy for calculation
  * @param {Object} [field.refClass] - Reference class info for REFERENCE types
  * @param {Object} [field.exhibitionConfigs] - UI display configurations
  * @returns {string} The `sy` builder chain code as a string
@@ -180,11 +198,6 @@ function generateFieldsSchema(classData, outputPath, rootPath) {
     // Filter out system fields (starting with _)
     const fields = (classData.fields || []).filter(f => !f.identifier.startsWith('_'));
 
-    if (fields.length === 0) {
-        logger.debug(`Skipping fields.js for ${classData.identifier} - no custom fields`);
-        return;
-    }
-
     // Calculate relative path from class directory to typings folder
     // Structure: rootPath/sydle-dev/package/Class/ -> rootPath/typings/sydleZod
     let sydleZodPath = '../../../typings/sydleZod'; // Default: 3 levels up
@@ -197,7 +210,7 @@ function generateFieldsSchema(classData, outputPath, rootPath) {
     let content = `/**
  * Sydle Schema - ${classData.name || classData.identifier}
  * Auto-generated from the schema definition file.
- * Reference: class.json
+ * Reference: class.json or task.json
  */
 
 const { sy } = require('${sydleZodPath}');
@@ -205,17 +218,30 @@ const { sy } = require('${sydleZodPath}');
 module.exports = {
 `;
 
-    fields.forEach((field, index) => {
-        const comma = index < fields.length - 1 ? ',' : '';
-        content += `    ${field.identifier}: ${mapFieldToSy(field)}${comma}\n`;
-    });
+    if (fields.length === 0) {
+        // Generate empty template with commented example
+        content += `    // Example field - uncomment and customize as needed:
+    // fieldName: sy.section('Section').name('Field Name').type('STRING').required(),
+`;
+    } else {
+        // Generate actual fields
+        fields.forEach((field, index) => {
+            const comma = index < fields.length - 1 ? ',' : '';
+            content += `    ${field.identifier}: ${mapFieldToSy(field)}${comma}\n`;
+        });
+    }
 
     content += `};
 `;
 
     const fieldsPath = path.join(outputPath, 'fields.js');
     fs.writeFileSync(fieldsPath, content);
-    logger.debug(`Generated fields.js for ${classData.identifier}`);
+
+    if (fields.length === 0) {
+        logger.debug(`Generated empty fields.js template for ${classData.identifier}`);
+    } else {
+        logger.debug(`Generated fields.js for ${classData.identifier} with ${fields.length} fields`);
+    }
 }
 
 module.exports = {

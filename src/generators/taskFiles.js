@@ -64,26 +64,37 @@ function generateTaskFiles(diagramPath, tasks, rootPath, classIdToIdentifier) {
             JSON.stringify(task, null, 2)
         );
 
-        // Generate fields, schema, and typings if task has fields
-        if (task.settings?.fields && task.settings.fields.length > 0) {
+        // Always generate fields folder and files (even if empty)
+        if (task.settings) {
             try {
+                // Create fields folder
+                const fieldsFolder = path.join(taskPath, 'fields');
+                if (!fs.existsSync(fieldsFolder)) {
+                    fs.mkdirSync(fieldsFolder, { recursive: true });
+                }
+
                 // Create a class-like object for generateFieldsSchema
                 const taskAsClass = {
                     identifier: taskFolderName,
                     name: task.settings._name || task.name || taskFolderName,
-                    fields: task.settings.fields
+                    fields: task.settings.fields || []
                 };
 
                 // Generate fields.js using SydleZod (correct parameter order: classData, outputPath, rootPath)
-                generateFieldsSchema(taskAsClass, taskPath, rootPath);
+                generateFieldsSchema(taskAsClass, fieldsFolder, rootPath);
 
                 // Generate task.d.ts for TypeScript definitions
-                generateTaskDts(taskPath, task.settings, classIdToIdentifier);
+                generateTaskDts(fieldsFolder, task.settings, classIdToIdentifier, taskFolderName);
 
                 // Generate task.schema.js for validation
-                generateTaskSchema(taskPath, task.settings);
+                generateTaskSchema(fieldsFolder, task.settings, taskFolderName);
 
-                logger.debug(`      ✓ Generated ${task.settings.fields.length} fields, types, and schema for task "${task.name || taskFolderName}"`);
+                const fieldCount = task.settings.fields?.length || 0;
+                if (fieldCount > 0) {
+                    logger.debug(`      ✓ Generated ${fieldCount} fields, types, and schema for task "${task.name || taskFolderName}"`);
+                } else {
+                    logger.debug(`      ✓ Generated empty fields structure for task "${task.name || taskFolderName}"`);
+                }
             } catch (error) {
                 logger.warn(`      ⚠ Failed to generate fields for task "${task.name || taskFolderName}": ${error.message}`);
             }

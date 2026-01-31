@@ -25,14 +25,26 @@ const executeMainMethod = async (id, method, data = {}, httpMethod = 'POST') => 
             config.params = data;
             delete config.data;
         }
-        // console.log(config)
+
+        // Debug logging: endpoint and payload
+        logger.debug(`API Call: ${httpMethod} ${url}`);
+        if (config.data) {
+            logger.debug(`Payload: ${JSON.stringify(config.data, null, 2)}`);
+        }
+        if (config.params) {
+            logger.debug(`Params: ${JSON.stringify(config.params, null, 2)}`);
+        }
+
         const response = await client(config);
+
+        logger.debug(`Response received: ${response.status} ${response.statusText}`);
+
         return response.data;
     } catch (error) {
         logger.error(`Error executing ${method} on ${id}: ${error.message}`);
         if (error.response) {
             logger.debug(`Response status: ${error.response.status}`);
-            logger.debug(`Response data: ${JSON.stringify(error.response.data)}`);
+            logger.debug(`Response data: ${JSON.stringify(error.response.data, null, 2)}`);
         }
         throw error;
     }

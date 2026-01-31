@@ -31,12 +31,12 @@ function taskNameToInterfaceName(taskName) {
 
 /**
  * Generate TypeScript .d.ts file for a task
- * @param {string} taskPath - Path to the task folder
+ * @param {string} fieldsPath - Path to the fields folder
  * @param {Object} taskSettings - Task settings object with fields
  * @param {Map} classIdToIdentifier - Map of class IDs to identifiers
+ * @param {string} taskFolderName - Task folder name for interface naming
  */
-function generateTaskDts(taskPath, taskSettings, classIdToIdentifier) {
-    const taskFolderName = path.basename(taskPath);
+function generateTaskDts(fieldsPath, taskSettings, classIdToIdentifier, taskFolderName) {
     const interfaceName = taskNameToInterfaceName(taskFolderName);
     const taskDisplayName = taskSettings._name || taskFolderName;
     const fields = taskSettings.fields || [];
@@ -61,7 +61,7 @@ function generateTaskDts(taskPath, taskSettings, classIdToIdentifier) {
 
     dtsContent += `}\n`;
 
-    fs.writeFileSync(path.join(taskPath, 'task.d.ts'), dtsContent);
+    fs.writeFileSync(path.join(fieldsPath, 'task.d.ts'), dtsContent);
 }
 
 module.exports = {
