@@ -213,10 +213,115 @@ async function syncTaskMethodCore(methodJsonPath, rootPath, logger) {
  * @returns {Promise<{success: boolean, skipped?: boolean, message?: string}>}
  */
 async function syncDiagramTaskCore(taskJsonPath, rootPath, logger) {
-    // Task metadata sync is disabled - tasks are managed through the diagram editor
-    // Only methods should be synced (via syncTaskMethodCore)
-    logger.debug(`   ⏭ Skipping task.json sync (task metadata is managed by diagram editor)`);
-    return { success: true, skipped: true };
+    try {
+        const taskFolder = path.dirname(taskJsonPath);
+        const taskName = path.basename(taskFolder);
+
+        logger.debug(`[DEBUG] Syncing task metadata for ${taskName}`);
+
+        if (!fs.existsSync(taskJsonPath)) {
+            logger.error(`❌ task.json not found: ${taskJsonPath}`);
+            return { success: false };
+        }
+
+        const taskData = JSON.parse(fs.readFileSync(taskJsonPath, 'utf-8'));
+
+        if (!taskData.settings || !taskData.settings._id || !taskData.settings._class || !taskData.settings._class._id) {
+            logger.error(`   ❌ Task settings not found or missing _id/_class._id in task.json`);
+            return { success: false };
+        }
+
+        const taskClassId = taskData.settings._class._id;
+        const taskInstanceId = taskData.settings._id;
+
+        logger.progress(`🔄 [DIAGRAM] Syncing task settings for '${taskName}'`);
+
+        // We want to patch the whole settings object, OR specific fields.
+        // For safety and simplicity given we just updated processFields, let's patch the fields we know about. 
+        // Ideally we'd patch 'processFields' and 'fields'.
+        // Let's create an operations list.
+
+        const operations = [];
+
+        // 1. processFields
+        if (taskData.settings.processFields) {
+            operations.push({
+                op: 'replace',
+                path: '/processFields',
+                value: taskData.settings.processFields
+            });
+        }
+
+        // 2. fields (local)
+        if (taskData.settings.fields) {
+            operations.push({
+                op: 'replace',
+                path: '/fields',
+                value: taskData.settings.fields
+            });
+        }
+
+        // 3. name (if changed)
+        if (taskData.settings._name) {
+            operations.push({
+                op: 'replace',
+                path: '/_name',
+                value: taskData.settings._name
+            });
+        }
+
+        if (operations.length === 0) {
+            logger.warn(`   ⚠ No syncable settings found to patch.`);
+            return { success: true, skipped: true };
+        }
+
+        const updateData = {
+            _id: taskInstanceId,
+            _operationsList: operations
+        };
+
+        await patch(taskClassId, updateData);
+
+        // Update diagram.json as well to keep it consistent
+        const diagramFolder = path.dirname(path.dirname(taskFolder)); // tasks -> diagram
+        const diagramJsonPath = path.join(diagramFolder, 'diagram.json');
+
+        if (fs.existsSync(diagramJsonPath)) {
+            const diagramData = JSON.parse(fs.readFileSync(diagramJsonPath, 'utf-8'));
+            if (diagramData.tasks) {
+                const localTaskIndex = diagramData.tasks.findIndex(item => {
+                    // Check identifier on item or item.settings
+                    const id = item.identifier || (item.settings && item.settings.identifier);
+                    const targetId = taskData.identifier || taskData.settings.identifier;
+                    return id === targetId;
+                });
+
+                if (localTaskIndex !== -1) {
+                    // Update the settings in diagram.json
+                    // We merge to avoid losing other properties that might be in diagram.json but not task.json (if any)
+                    // But effectively task.json settings should override.
+
+                    // Helper to merge specific props we care about to avoid overwriting structural diagram props
+                    const currentSettings = diagramData.tasks[localTaskIndex].settings || {};
+
+                    if (taskData.settings.processFields) currentSettings.processFields = taskData.settings.processFields;
+                    if (taskData.settings.fields) currentSettings.fields = taskData.settings.fields;
+                    if (taskData.settings._name) currentSettings._name = taskData.settings._name;
+
+                    diagramData.tasks[localTaskIndex].settings = currentSettings;
+
+                    fs.writeFileSync(diagramJsonPath, JSON.stringify(diagramData, null, 4), 'utf-8');
+                }
+            }
+        }
+
+        logger.success(`   ✓ Task settings synced (processFields/fields)`);
+        return { success: true };
+
+    } catch (error) {
+        logger.error(`   ❌ Failed to sync task settings: ${error.message}`);
+        return { success: false, message: error.message };
+    }
 }
 
 /**

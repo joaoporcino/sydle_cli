@@ -176,6 +176,10 @@ function mapFieldToSy(field) {
  * @param {string} classData.identifier - Unique class identifier
  * @param {string} [classData.name] - Display name of the class
  * @param {Array<Object>} [classData.fields] - Array of field definitions
+ * @param {Array<string|{identifier: string}>} [classData.processFields] - Optional array of process field identifiers
+ * @param {string} [classData.processFieldsJSDoc] - Optional JSDoc for processFields
+ * @param {string} [classData.processFieldsReferencePath] - Optional path for reference directive
+ * @param {string} [classData.processFieldsInterface] - Optional interface name for processFields
  * @param {string} outputPath - Directory path to write the `fields.js` file
  * @param {string} [rootPath] - Root project path to calculate relative import path
  * 
@@ -212,16 +216,39 @@ function generateFieldsSchema(classData, outputPath, rootPath) {
  * Auto-generated from the schema definition file.
  * Reference: class.json or task.json
  */
-
-const { sy } = require('${sydleZodPath}');
-
-module.exports = {
 `;
+
+    if (classData.processFieldsReferencePath) {
+        content += `/// <reference path="${classData.processFieldsReferencePath}" />\n`;
+    }
+
+    content += `
+const { sy } = require('${sydleZodPath}');\n`;
+
+    // Add processFields if available
+    if (classData.processFields && classData.processFields.length > 0) {
+        content += `\n// Campos do processo vindos do settings.processFields\n`;
+        if (classData.processFieldsInterface) {
+            content += `/** @type {Array<keyof ${classData.processFieldsInterface}>} */\n`;
+        }
+        // Ensure we only have identifiers
+        const pFields = classData.processFields.map(f => typeof f === 'string' ? f : f?.identifier).filter(Boolean);
+        content += `const processFields = ${JSON.stringify(pFields, null, 2)};\n`;
+    } else if (classData.processFields) {
+        // If it exists but is empty, define as empty array
+        content += `\n// Campos do processo vindos do settings.processFields\n`;
+        if (classData.processFieldsInterface) {
+            content += `/** @type {Array<keyof ${classData.processFieldsInterface}>} */\n`;
+        }
+        content += `const processFields = [];\n`;
+    }
+
+    content += `\nmodule.exports = {\n`;
 
     if (fields.length === 0) {
         // Generate empty template with commented example
-        content += `    // Example field - uncomment and customize as needed:
-    // fieldName: sy.section('Section').name('Field Name').type('STRING').required(),
+        content += `    // Exemplo de campo - descomente e personalize conforme necessario:
+    // nomeDoCampo: sy.section('Secao').name('Nome do Campo').type('STRING').required(),
 `;
     } else {
         // Generate actual fields
@@ -230,6 +257,9 @@ module.exports = {
             content += `    ${field.identifier}: ${mapFieldToSy(field)}${comma}\n`;
         });
     }
+
+    // Export processFields REMOVED as per user request
+    // We keep it defined as const above, but do not export it.
 
     content += `};
 `;

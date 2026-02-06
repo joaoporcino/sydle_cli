@@ -16,6 +16,16 @@ function mapToTsType(field, classIdToIdentifier) {
     let type = 'any';
     const baseType = field.type;
 
+    // Check for valueOptions first (enums)
+    if (field.valueOptions && field.valueOptions.length > 0) {
+        const unionType = field.valueOptions.map(opt => {
+            const val = typeof opt === 'object' ? opt.value : opt;
+            return `'${val}'`;
+        }).join(' | ');
+
+        return field.multiple ? `(${unionType})[]` : unionType;
+    }
+
     // For REFERENCE fields, use the referenced class interface
     if (baseType === 'REFERENCE' && field.refClass && field.refClass._id) {
         const refClassName = classIdToIdentifier.get(field.refClass._id);

@@ -22,9 +22,10 @@ const PROCESS_VERSION_CLASS_ID = '595c20500000000000000110';
  * @param {string} fieldsJsPath - Absolute path to the fields.js file (usually in pin/)
  * @param {string} rootPath - Root project path
  * @param {Object} logger - Logger instance
+ * @param {Map} [classIdToIdentifier] - Map of class IDs to identifiers for d.ts generation
  * @returns {Promise<{success: boolean, message?: string}>}
  */
-async function syncFieldsProcessCore(fieldsJsPath, rootPath, logger) {
+async function syncFieldsProcessCore(fieldsJsPath, rootPath, logger, classIdToIdentifier) {
     const fieldsFolder = path.dirname(fieldsJsPath); // e.g., .../1_0/pin/fields
 
     // Determine version.json path
@@ -119,6 +120,42 @@ async function syncFieldsProcessCore(fieldsJsPath, rootPath, logger) {
         // 6. Update local version.json
         versionData.fields = mergedFields;
         fs.writeFileSync(versionJsonPath, JSON.stringify(versionData, null, 4), 'utf-8');
+
+        // 7. Regenerate definitions (d.ts and schema) to update IntelliSense
+        if (classIdToIdentifier) {
+            const { generateClassDts, generateClassSchema } = require('../generators');
+            const versionDir = path.dirname(versionJsonPath);
+            const processDir = path.dirname(versionDir);
+            const processJsonPath = path.join(processDir, 'process.json');
+
+            // Try to set the correct identifier from process.json
+            if (fs.existsSync(processJsonPath)) {
+                try {
+                    logger.debug(`      Checking process.json at: ${processJsonPath}`);
+                    const processData = JSON.parse(fs.readFileSync(processJsonPath, 'utf8'));
+                    if (processData.identifier) {
+                        versionData.identifier = processData.identifier;
+                        logger.debug(`      Set identifier to: ${versionData.identifier}`);
+                    } else {
+                        logger.warn(`      process.json has no identifier`);
+                    }
+                } catch (e) {
+                    logger.warn(`      ⚠ Failed to read process.json: ${e.message}`);
+                }
+            } else {
+                logger.warn(`      process.json not found at: ${processJsonPath}`);
+            }
+
+            const pinPath = path.join(versionDir, 'pin');
+            const CLASS_CLASS_ID = '000000000000000000000000';
+
+            // Ensure pin folder exists (it should)
+            if (fs.existsSync(pinPath)) {
+                await generateClassDts(versionData, pinPath, { classIdToIdentifier, classId: CLASS_CLASS_ID });
+                generateClassSchema(versionData, pinPath);
+                logger.debug(`      ✓ Regenerated class.d.ts and class.schema.js for IntelliSense`);
+            }
+        }
 
         logger.success(`   ✓ Fields synced (${newFields.length} user fields, ${systemFields.length} system fields)`);
         return { success: true };

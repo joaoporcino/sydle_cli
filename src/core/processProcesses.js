@@ -67,13 +67,11 @@ async function generatePinStructure(versionPath, versionData, rootPath, classIdT
     generateMethodFiles(pinPath, versionData.methods || [], rootPath, classIdToIdentifier, versionData);
 
     // Generate fields schema (reuse existing generator - create fields/ folder)
-    if (versionData.fields && versionData.fields.length > 0) {
-        const fieldsFolder = path.join(pinPath, 'fields');
-        if (!fs.existsSync(fieldsFolder)) {
-            fs.mkdirSync(fieldsFolder, { recursive: true });
-        }
-        generateFieldsSchema(versionData, fieldsFolder, rootPath);
+    const fieldsFolder = path.join(pinPath, 'fields');
+    if (!fs.existsSync(fieldsFolder)) {
+        fs.mkdirSync(fieldsFolder, { recursive: true });
     }
+    generateFieldsSchema(versionData, fieldsFolder, rootPath);
 
     // Generate processRoles inside pin/ directory
     if (versionData.processRoles && versionData.processRoles.length > 0) {
@@ -225,6 +223,9 @@ async function processProcesses(processesData, options = {}) {
                         versionsCount++;
                         logger.debug(`   📌 Fetched current version: ${versionLabel}`);
 
+                        // Inject identifier from processData to versionData for consistent naming
+                        versionData.identifier = processData.identifier;
+
                         // Generate pin structure (includes processRoles)
                         await generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier);
 
@@ -265,6 +266,9 @@ async function processProcesses(processesData, options = {}) {
                                 JSON.stringify(versionData, null, 2)
                             );
                             versionsCount++;
+
+                            // Inject identifier from processData to versionData for consistent naming
+                            versionData.identifier = processData.identifier;
 
                             // Generate pin structure (includes processRoles)
                             await generatePinStructure(versionPath, versionData, rootPath, classIdToIdentifier);

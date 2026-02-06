@@ -75,26 +75,54 @@ function generateDiagramElementFiles(diagramPath, elements, elementType, rootPat
             JSON.stringify(element, null, 2)
         );
 
-        // Generate fields, schema, and typings if element has fields
-        if (element.settings?.fields && element.settings.fields.length > 0) {
+        // Generate fields, schema, and typings if element has settings (even if fields is empty)
+        if (element.settings) {
             try {
+                // Try to find the interface name from pin/class.d.ts for IntelliSense
+                let processFieldsReferencePath = null;
+                let processFieldsInterface = null;
+                const pinPath = path.join(path.dirname(diagramPath), 'pin');
+                const classDtsPath = path.join(pinPath, 'class.d.ts');
+
+                if (fs.existsSync(classDtsPath)) {
+                    try {
+                        const dtsContent = fs.readFileSync(classDtsPath, 'utf8');
+                        // Look for "declare interface (I_Data_...)" to support both I_Data and I_Data_CustomName
+                        const match = dtsContent.match(/declare interface (I_Data(?:_\w+)?)/);
+                        if (match && match[1]) {
+                            processFieldsInterface = match[1];
+                            processFieldsReferencePath = path.relative(elementPath, classDtsPath).replace(/\\/g, '/');
+                        }
+                    } catch (e) {
+                        logger.warn(`      ⚠ Failed to read class.d.ts for IntelliSense: ${e.message}`);
+                    }
+                }
+
                 // Create a class-like object for generateFieldsSchema
                 const elementAsClass = {
                     identifier: elementFolderName,
                     name: element.settings._name || element.name || elementFolderName,
-                    fields: element.settings.fields
+                    fields: element.settings.fields || [],
+                    processFields: element.settings.processFields || [],
+                    processFieldsReferencePath,
+                    processFieldsInterface
                 };
 
                 // Generate fields.js using SydleZod
                 generateFieldsSchema(elementAsClass, elementPath, rootPath);
 
                 // Generate .d.ts for TypeScript definitions
-                generateTaskDts(elementPath, element.settings, classIdToIdentifier);
+                generateTaskDts(elementPath, element.settings, classIdToIdentifier, elementFolderName);
 
                 // Generate .schema.js for validation
-                generateTaskSchema(elementPath, element.settings);
+                generateTaskSchema(elementPath, element.settings, elementFolderName);
 
-                logger.debug(`      ✓ Generated ${element.settings.fields.length} fields, types, and schema for ${singularType} "${element.name || elementFolderName}"`);
+                const fieldCount = element.settings.fields?.length || 0;
+                if (fieldCount > 0) {
+                    logger.debug(`      ✓ Generated ${fieldCount} fields, types, and schema for ${singularType} "${element.name || elementFolderName}"`);
+                } else {
+                    logger.debug(`      ✓ Generated empty fields structure for ${singularType} "${element.name || elementFolderName}"`);
+                }
             } catch (error) {
                 logger.warn(`      ⚠ Failed to generate fields for ${singularType} "${element.name || elementFolderName}": ${error.message}`);
             }

@@ -13,6 +13,44 @@ const { syncFieldsProcessCore } = require('../core/syncFieldsProcess');
 const { syncProcessRolesCore } = require('../core/syncProcessRoles');
 const { syncDiagramTaskCore, syncDiagramTaskScriptCore } = require('../core/syncLogicDiagram');
 
+// Helper to load existing classes for type resolution
+// Copied/Adapted from processProcesses.js logic
+function loadExistingClasses(env, logger) {
+    const classIdToIdentifier = new Map();
+    const sydleDevPath = path.join(process.cwd(), `sydle-${env}`);
+
+    if (fs.existsSync(sydleDevPath)) {
+        logger.info('Phase 0: Loading existing classes for type resolution...');
+
+        const loadClassesRecursively = (dir) => {
+            const items = fs.readdirSync(dir);
+            for (const item of items) {
+                const itemPath = path.join(dir, item);
+                const stat = fs.statSync(itemPath);
+
+                if (stat.isDirectory()) {
+                    const classJsonPath = path.join(itemPath, 'class.json');
+                    if (fs.existsSync(classJsonPath)) {
+                        try {
+                            const classData = JSON.parse(fs.readFileSync(classJsonPath, 'utf8'));
+                            if (classData._id && classData.identifier) {
+                                classIdToIdentifier.set(classData._id, classData.identifier);
+                            }
+                        } catch (error) {
+                            // Silently skip malformed files
+                        }
+                    }
+                    loadClassesRecursively(itemPath);
+                }
+            }
+        };
+
+        loadClassesRecursively(sydleDevPath);
+        logger.debug(`Loaded ${classIdToIdentifier.size} existing classes for type resolution.`);
+    }
+    return classIdToIdentifier;
+}
+
 const watchProcessCommand = new Command('monitorarProcesso')
     .alias('watchProcess')
     .description('Watch for changes in process files (scripts and fields) and sync to Sydle')
@@ -38,6 +76,37 @@ const watchProcessCommand = new Command('monitorarProcesso')
                 logger.info(`   Run 'sydle listProcesses' first to generate the folder structure.`);
                 return;
             }
+
+            // Ensure global types exist for IntelliSense
+            const sourceSydleDts = path.join(__dirname, '../../typings/sydle.d.ts');
+            const destSydleDts = path.join(rootPath, 'sydle.d.ts');
+            if (fs.existsSync(sourceSydleDts) && !fs.existsSync(destSydleDts)) {
+                fs.copyFileSync(sourceSydleDts, destSydleDts);
+                logger.success('Testing environment: Copied sydle.d.ts');
+            }
+
+            const globalsDtsPath = path.join(rootPath, 'globals.d.ts');
+            if (!fs.existsSync(globalsDtsPath)) {
+                fs.writeFileSync(globalsDtsPath, '/// <reference path="./sydle.d.ts" />\n');
+                logger.success('Testing environment: Created globals.d.ts');
+            }
+
+            const jsConfigPath = path.join(rootPath, 'jsconfig.json');
+            if (!fs.existsSync(jsConfigPath)) {
+                const jsConfig = {
+                    compilerOptions: {
+                        target: "ES6",
+                        module: "commonjs",
+                        checkJs: true
+                    },
+                    include: ["**/*"]
+                };
+                fs.writeFileSync(jsConfigPath, JSON.stringify(jsConfig, null, 2));
+                logger.success('Testing environment: Created jsconfig.json');
+            }
+
+            // Phase 0: Load existing classes for type resolution (needed for d.ts generation)
+            const classIdToIdentifier = loadExistingClasses(env, logger);
 
             // Build glob patterns
             const scriptGlobPattern = '**/pin/**/scripts/script_*.js';
@@ -130,7 +199,15 @@ const watchProcessCommand = new Command('monitorarProcesso')
                     if (fieldsDebounceTimers.has(filePath)) clearTimeout(fieldsDebounceTimers.get(filePath));
                     const timer = setTimeout(async () => {
                         fieldsDebounceTimers.delete(filePath);
-                        await syncFieldsProcessCore(filePath, rootPath, logger);
+
+                        // Check if it is a TASK fields.js (inside diagram/tasks)
+                        if (filePath.includes(path.sep + 'diagram' + path.sep + 'tasks')) {
+                            const { syncTaskFieldsCore } = require('../core/syncTaskFields');
+                            await syncTaskFieldsCore(filePath, rootPath, logger);
+                        } else {
+                            // Process Version fields.js
+                            await syncFieldsProcessCore(filePath, rootPath, logger, classIdToIdentifier);
+                        }
                     }, 500);
                     fieldsDebounceTimers.set(filePath, timer);
                     return;
@@ -186,7 +263,7 @@ const watchProcessCommand = new Command('monitorarProcesso')
                     if (fieldsDebounceTimers.has(filePath)) clearTimeout(fieldsDebounceTimers.get(filePath));
                     const timer = setTimeout(async () => {
                         fieldsDebounceTimers.delete(filePath);
-                        await syncProcessFieldsCore(filePath, logger);
+                        await syncFieldsProcessCore(filePath, rootPath, logger, classIdToIdentifier);
                     }, 500);
                     fieldsDebounceTimers.set(filePath, timer);
                 }
